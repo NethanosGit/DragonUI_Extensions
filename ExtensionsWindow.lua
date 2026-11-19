@@ -54,10 +54,27 @@ local PAGES = {
     },
 }
 
+PAGES.additional = {
+    title = "Additional Bars",
+    items = {
+        { label = "Stance Bar",   prefix = "additional.stance." },
+        { label = "Pet Bar",      prefix = "additional.pet." },
+        { label = "Totem Bar",    prefix = "additional.totem." },
+        { label = "Extra Bar 1",  prefix = "additional.extrabar1." },
+    },
+}
+
+PAGES.xprep = {
+    title = "XP & Rep Bars",
+    items = {
+        { label = "XP & Rep Bars", prefix = "xprepbar." },
+    },
+}
+
 -- Sidebar categories, in order. Each tab key is a PAGES key.
 local CATEGORIES = {
     { label = "Frames", tabs = { "units" } },
-    { label = "Bars",   tabs = { "bars" } },
+    { label = "Bars",   tabs = { "bars", "additional", "xprep" } },
 }
 
 local window, scroll, currentPage

@@ -4,8 +4,9 @@ Extra options for [DragonUI](../DragonUI), loaded as a separate addon.
 
 ## Features
 
-- **Show on Target** for unit frames (Player, Target, Focus, Pet, Boss) and action bars (Main,
-  Right, Left, Bottom Left, Bottom Right). When on, the entry is shown while a target exists and
+- **Show on Target** for unit frames (Player, Target, Focus, Pet, Boss), action bars (Main,
+  Right, Left, Bottom Left, Bottom Right), additional bars (Stance, Pet, Totem, Extra Bar 1) and
+  XP & Rep bars. When on, the entry is shown while a target exists and
   hidden otherwise. It is exclusive with DragonUI's *Show on Hover Only*, *Show in Combat Only*
   and *Hide in Combat* for that entry.
   - Open the settings window with `/duiext`.

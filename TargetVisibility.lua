@@ -31,6 +31,13 @@ local BAR_PREFIX = {
     bottom_right = "actionbars.bottom_right_",
     right        = "actionbars.right_",
     left         = "actionbars.left_",
+    -- Additional bars keep their settings in their own table, not in actionbars.
+    stancebar    = "additional.stance.",
+    petbar       = "additional.pet.",
+    totembar     = "additional.totem.",
+    extrabar1    = "additional.extrabar1.",
+    -- XP and Rep share one config table.
+    xprepbar     = "xprepbar.",
 }
 
 local function PrefixOf(key)
