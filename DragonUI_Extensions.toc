@@ -1,7 +1,8 @@
 ## Interface: 30300
-## Title: DragonUI Extensions
+## Title: |cff1784d1DragonUI Extensions|r
 ## Notes: Extra options for DragonUI (Show on Target visibility mode for unit frames).
 ## Version: 0.1.0
-## Dependencies: DragonUI
+## Dependencies: DragonUI, DragonUI_Options
 
 TargetVisibility.lua
+ExtensionsWindow.lua

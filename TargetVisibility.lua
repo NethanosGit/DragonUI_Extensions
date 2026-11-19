@@ -1,61 +1,93 @@
--- DragonUI_Extensions: "Show on Target" visibility mode for DragonUI's unit frames.
+-- DragonUI_Extensions: "Show on Target" visibility mode for DragonUI's unit frames and action bars.
 --
--- Adds a third option next to "Show on Hover Only" and "Show in Combat Only" in each unit
--- frame's Visibility group (editor mode). When enabled, the frame is shown while a target
--- exists and hidden otherwise. It is exclusive with the other two, like they are with each other.
+-- When enabled for a frame or bar, it is shown while a target exists and hidden otherwise.
+-- It is exclusive with DragonUI's "Show on Hover Only", "Show in Combat Only" and "Hide in Combat".
+-- The option is set in the standalone window (/duiext, see ExtensionsWindow.lua).
 --
--- Relies on DragonUI internals:
---   _G.DragonUI, addon.VisibilityFade (Register / Update / Reset) and addon.EditorSettings
---   (Get / GetDB / SetDB / IsLocked). The engine's own rules are left untouched for every
---   other combination; this file only takes over a key while "Show on Target" is the sole mode.
+-- Relies on DragonUI internals: _G.DragonUI, addon.VisibilityFade (Register / Update / Reset).
+-- Nothing in DragonUI or DragonUI_Options is modified. The engine's rules are left untouched for
+-- every other combination; this file only takes over an entry while "Show on Target" is the sole mode.
 
 local DUI = _G.DragonUI
-if not (DUI and DUI.VisibilityFade and DUI.EditorSettings) then return end
+if not (DUI and DUI.VisibilityFade) then return end
 
 local VF = DUI.VisibilityFade
-local E = DUI.EditorSettings
 
 local FLAG = "show_on_target"
-local OTHER_FLAGS = { "show_on_hover", "show_in_combat", "hide_in_combat" }
 
--- Visibility key (as passed to VF.Register) -> DragonUI profile root and editor frame name.
--- boss1..boss5 all share one root and one editor entry.
-local UNITS = {
-    player = { root = "unitframe.player", editor = "player" },
-    target = { root = "unitframe.target", editor = "target" },
-    focus  = { root = "unitframe.focus",  editor = "focus" },
-    pet    = { root = "unitframe.pet",    editor = "PetFrame" },
-    boss   = { root = "unitframe.boss",   editor = "boss" },
+-- Visibility key (as passed to VF.Register) -> DragonUI profile prefix of its settings.
+-- Flags are read as prefix .. name, e.g. "unitframe.player." .. "show_on_hover".
+local UNIT_PREFIX = {
+    player = "unitframe.player.",
+    target = "unitframe.target.",
+    focus  = "unitframe.focus.",
+    pet    = "unitframe.pet.",
+    boss   = "unitframe.boss.", -- boss1..boss5 share it
 }
 
-local function UnitOf(key)
-    if UNITS[key] then return UNITS[key] end
-    if string.match(key, "^boss%d+$") then return UNITS.boss end
-    return nil
+local BAR_PREFIX = {
+    main         = "actionbars.main_",
+    bottom_left  = "actionbars.bottom_left_",
+    bottom_right = "actionbars.bottom_right_",
+    right        = "actionbars.right_",
+    left         = "actionbars.left_",
+}
+
+local function PrefixOf(key)
+    if UNIT_PREFIX[key] then return UNIT_PREFIX[key] end
+    if string.match(key, "^boss%d+$") then return UNIT_PREFIX.boss end
+    return BAR_PREFIX[key]
+end
+
+-- Reads and writes DragonUI's profile, the same table its own options use.
+local function GetProfileValue(path)
+    local node = DUI.db and DUI.db.profile
+    if not node then return nil end
+    for key in string.gmatch(path, "[^%.]+") do
+        if type(node) ~= "table" then return nil end
+        node = node[key]
+    end
+    return node
+end
+
+local function SetProfileValue(path, value)
+    local profile = DUI.db and DUI.db.profile
+    if not profile then return end
+    local keys = { strsplit(".", path) }
+    local node = profile
+    for i = 1, #keys - 1 do
+        if type(node[keys[i]]) ~= "table" then node[keys[i]] = {} end
+        node = node[keys[i]]
+    end
+    node[keys[#keys]] = value
+end
+
+local function FlagOn(prefix, name)
+    return GetProfileValue(prefix .. name) == true
+end
+
+local function OtherModeOn(prefix)
+    return FlagOn(prefix, "show_on_hover") or FlagOn(prefix, "show_in_combat") or FlagOn(prefix, "hide_in_combat")
 end
 
 -- ============================================================================
 -- TRACK REGISTRATIONS
 -- ============================================================================
 
-local records = {} -- visibility key -> { frame, opts, unit }
+local records = {} -- visibility key -> { frame, opts, prefix }
 
 local origRegister = VF.Register
 function VF.Register(key, frame, opts)
     origRegister(key, frame, opts)
-    local unit = UnitOf(key)
-    if unit and frame and opts and opts.dbTable then
-        records[key] = { frame = frame, opts = opts, unit = unit }
+    local prefix = PrefixOf(key)
+    if prefix and frame and opts and opts.dbTable then
+        records[key] = { frame = frame, opts = opts, prefix = prefix }
     end
 end
 
 -- ============================================================================
 -- VISIBILITY
 -- ============================================================================
-
-local function OtherModeOn(cfg)
-    return cfg.show_on_hover or cfg.show_in_combat or cfg.hide_in_combat
-end
 
 local function Clamp01(value)
     value = tonumber(value) or 0
@@ -88,86 +120,53 @@ end
 local origUpdate = VF.Update
 function VF.Update(key)
     local rec = records[key]
-    local cfg = rec and rec.opts.dbTable and rec.opts.dbTable()
-    if cfg and cfg.show_on_target then
-        if not OtherModeOn(cfg) then
-            return UpdateTargetMode(key, rec, cfg)
+    if rec and FlagOn(rec.prefix, FLAG) then
+        -- Some bars return no config while disabled; those are left to the engine.
+        local cfg = rec.opts.dbTable and rec.opts.dbTable()
+        if cfg then
+            if not OtherModeOn(rec.prefix) then
+                return UpdateTargetMode(key, rec, cfg)
+            end
+            -- Another mode was switched on elsewhere. Drop the stale flag so this mode cannot
+            -- come back on its own later.
+            SetProfileValue(rec.prefix .. FLAG, false)
         end
-        -- Another mode was switched on in DragonUI's own rows. Drop the stale flag so this
-        -- mode cannot come back on its own later.
-        E.SetDB(rec.unit.root .. "." .. FLAG, false)
     end
     return origUpdate(key)
 end
 
--- Target gained or lost: re-evaluate only the keys in this mode (the engine handles the rest).
+-- Target gained or lost: re-evaluate only the entries in this mode (the engine handles the rest).
 local targetEvents = CreateFrame("Frame")
 targetEvents:RegisterEvent("PLAYER_TARGET_CHANGED")
 targetEvents:SetScript("OnEvent", function()
     for key, rec in pairs(records) do
-        local cfg = rec.opts.dbTable and rec.opts.dbTable()
-        if cfg and cfg.show_on_target and not OtherModeOn(cfg) then
+        if FlagOn(rec.prefix, FLAG) and not OtherModeOn(rec.prefix) then
             VF.Update(key)
         end
     end
 end)
 
 -- ============================================================================
--- EDITOR ROWS
+-- PUBLIC API (used by ExtensionsWindow.lua)
 -- ============================================================================
 
-local function RefreshUnit(unit)
-    for key, rec in pairs(records) do
-        if rec.unit == unit then VF.Update(key) end
-    end
+local EXT = _G.DragonUIExtensions or {}
+_G.DragonUIExtensions = EXT
+
+-- prefix: a settings prefix from the tables above, e.g. "unitframe.player." or "actionbars.main_".
+function EXT.GetShowOnTarget(prefix)
+    return FlagOn(prefix, FLAG)
 end
 
-local function MakeRow(unit)
-    local path = unit.root .. "." .. FLAG
-    return {
-        type = "checkbox",
-        key = path,
-        label = "Show on Target",
-        path = path,
-        get = function()
-            -- Shown as off while another mode owns the frame, matching what the engine does.
-            return (E.GetDB(path) and not OtherModeOn({
-                show_on_hover = E.GetDB(unit.root .. ".show_on_hover"),
-                show_in_combat = E.GetDB(unit.root .. ".show_in_combat"),
-                hide_in_combat = E.GetDB(unit.root .. ".hide_in_combat"),
-            })) and true or false
-        end,
-        set = function(value)
-            if E.IsLocked() then return end
-            if value then
-                for _, name in ipairs(OTHER_FLAGS) do
-                    E.SetDB(unit.root .. "." .. name, false)
-                end
-            end
-            E.SetDB(path, value and true or false)
-            RefreshUnit(unit)
-        end,
-        disabled = function() return E.IsLocked() and true or false end,
-        needsOverlayResize = false,
-    }
-end
-
-local installed = {}
-local function InstallRows()
-    for _, unit in pairs(UNITS) do
-        local def = E.Get(unit.editor)
-        if def and not installed[unit.editor] then
-            table.insert(def.settings, MakeRow(unit))
-            installed[unit.editor] = true
+-- Turning it on also turns off the other three visibility modes for that entry.
+function EXT.SetShowOnTarget(prefix, value)
+    if value then
+        for _, name in ipairs({ "show_on_hover", "show_in_combat", "hide_in_combat" }) do
+            SetProfileValue(prefix .. name, false)
         end
     end
+    SetProfileValue(prefix .. FLAG, value and true or false)
+    for key, rec in pairs(records) do
+        if rec.prefix == prefix then VF.Update(key) end
+    end
 end
-
--- The editor's Visibility rows are built by DragonUI at load; rows added here land after them,
--- so "Show on Target" sits in the same folded group, after "Hover/Combat Logic".
-local loader = CreateFrame("Frame")
-loader:RegisterEvent("PLAYER_LOGIN")
-loader:SetScript("OnEvent", function(self)
-    InstallRows()
-    self:UnregisterEvent("PLAYER_LOGIN")
-end)
