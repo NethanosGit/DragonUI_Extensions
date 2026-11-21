@@ -5,4 +5,7 @@
 ## Dependencies: DragonUI, DragonUI_Options
 
 TargetVisibility.lua
+NameplateName.lua
+NameplateHealthText.lua
+NameplateLevel.lua
 ExtensionsWindow.lua

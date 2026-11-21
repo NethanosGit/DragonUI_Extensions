@@ -71,13 +71,119 @@ PAGES.xprep = {
     },
 }
 
--- Sidebar categories, in order. Each tab key is a PAGES key.
-local CATEGORIES = {
-    { label = "Frames", tabs = { "units" } },
-    { label = "Bars",   tabs = { "bars", "additional", "xprep" } },
+-- Name: the name font size, down to 0.5 (DragonUI_Options stops at 1).
+PAGES.name = {
+    title = "Name",
+    build = function(container)
+        local C = DUI.PanelControls
+        C:AddDescription(container, "Font size of the nameplate name. Goes down to -3, below the 1 that DragonUI_Options allows.")
+        C:AddSpacer(container)
+
+        local section = C:AddSection(container, "Name Text")
+        local limits = EXT.NAME_SIZE_LIMITS
+        C:AddSlider(section, {
+            label = "Font Size",
+            desc = "Font size of the name (-3 to 10 in steps of 0.5, default 2). The name is drawn at 9 + this value.",
+            min = limits.min, max = limits.max, step = limits.step,
+            width = 200,
+            getFunc = function() return EXT.GetNameSize() end,
+            setFunc = function(value) EXT.SetNameSize(value) end,
+        })
+        C:AddToggle(section, {
+            label = "Ignore Nameplate Width",
+            getFunc = function() return EXT.IsNameCropDisabled() end,
+            setFunc = function(value) EXT.SetNameCropDisabled(value) end,
+        })
+    end,
+}
+
+-- Health: its own settings, not the Show on Target toggles. Built by its own function.
+PAGES.health = {
+    title = "Health",
+    build = function(container)
+        local C = DUI.PanelControls
+        C:AddDescription(container, "Health text font size for nameplates. It applies in every style, including Modern.")
+        C:AddSpacer(container)
+
+        local section = C:AddSection(container, "Health Text")
+        C:AddSlider(section, {
+            label = "Font Size",
+            desc = "Font size of the health text (-3 to 10, default 2). The text is drawn at 7 + this value.",
+            min = -3, max = 10, step = 1,
+            width = 200,
+            getFunc = function() return EXT.GetHealthTextSize() end,
+            setFunc = function(value) EXT.SetHealthTextSize(value) end,
+        })
+    end,
+}
+
+-- Level: where the level number is drawn. Same control style as Health Text > Position.
+PAGES.level = {
+    title = "Level",
+    build = function(container)
+        local C = DUI.PanelControls
+        C:AddDescription(container, "Where the level number is drawn. Before the Name is the layout DragonUI uses by default.")
+        C:AddSpacer(container)
+
+        local section = C:AddSection(container, "Level")
+        C:AddDropdown(section, {
+            label = "Position",
+            desc = "Before the Name keeps the level inside the name. The outside options draw it beside the health bar.",
+            values = {
+                beforeName   = "Before the Name",
+                outsideLeft  = "Outside the Bar, Left",
+                outsideRight = "Outside the Bar, Right",
+            },
+            width = 260,
+            getFunc = function() return EXT.GetLevelPlacement() end,
+            setFunc = function(value) EXT.SetLevelPlacement(value) end,
+        })
+        C:AddDropdown(section, {
+            label = "Style",
+            desc = "Outline and shadow of the level text. Applies when the level is drawn outside the bar; inside the name it shares the name's style.",
+            values = {
+                outline = "Outline",
+                shadow  = "Shadow",
+                both    = "Outline & Shadow",
+            },
+            width = 260,
+            getFunc = function() return EXT.GetLevelStyle() end,
+            setFunc = function(value) EXT.SetLevelStyle(value) end,
+        })
+    end,
 }
 
 local window, scroll, currentPage
+local RenderPage
+
+-- Nameplates: one sidebar entry under Frames, with Name / Health / Level as sub-tabs, like
+-- DragonUI_Options. Each sub-tab is built by the matching PAGES entry above.
+local NAMEPLATE_SUBTABS = {
+    { key = "name",   label = "Name" },
+    { key = "health", label = "Health" },
+    { key = "level",  label = "Level" },
+}
+local activeNameplateSubTab = "name"
+
+PAGES.nameplates = {
+    title = "Nameplates",
+    build = function(container)
+        local C = DUI.PanelControls
+        C:AddSubTabs(container, NAMEPLATE_SUBTABS, activeNameplateSubTab, function(key)
+            activeNameplateSubTab = key
+            RenderPage("nameplates")
+        end)
+        local sub = PAGES[activeNameplateSubTab]
+        if sub and sub.build then sub.build(container) end
+    end,
+}
+
+-- Sidebar categories, in order. Each tab key is a PAGES key.
+local CATEGORIES = {
+    { label = "Frames", tabs = { "units", "nameplates" } },
+    { label = "Bars",   tabs = { "bars", "additional", "xprep" } },
+}
+
 local tabButtons = {}
 
 -- ============================================================================
@@ -85,6 +191,9 @@ local tabButtons = {}
 -- ============================================================================
 
 local function BuildPage(container, page)
+    if page.build then
+        return page.build(container)
+    end
     local C = DUI.PanelControls
     C:AddDescription(container, "Show a frame only while you have a target selected. Turning it on turns off hover and combat visibility for that frame.")
     C:AddSpacer(container)
@@ -109,7 +218,7 @@ local function ReleaseScroll()
     end
 end
 
-local function RenderPage(key)
+function RenderPage(key)
     local page = PAGES[key]
     if not page then return end
     currentPage = key

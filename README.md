@@ -10,12 +10,28 @@ Extra options for [DragonUI](../DragonUI), loaded as a separate addon.
   hidden otherwise. It is exclusive with DragonUI's *Show on Hover Only*, *Show in Combat Only*
   and *Hide in Combat* for that entry.
   - Open the settings window with `/duiext`.
+- **Frames > Nameplates > Health** (tab): the health text Font Size (-3 to 10), with no style restrictions. It works
+  in the Modern style too, where DragonUI_Options locks the slider and sizes the text like the name.
+  Stored as `modules.nameplates.healthNumberFontSize`, the same key DragonUI_Options uses.
+- **Frames > Nameplates > Name** (tab): Font Size of the name, from -3 to 10 in steps of 0.5. DragonUI_Options
+  stops at 1. The name is drawn at 9 + the value; the power text uses 7 + the value.
+  Stored as `modules.nameplates.fontSize`, the same key DragonUI_Options uses. If the value is below
+  1, DragonUI_Options' slider shows its own minimum, so use this page to change it.
+  *Ignore Nameplate Width* stops the name being limited to the plate width, so it is never cut with
+  "..." (`modules.nameplates.extNameNoCrop`).
+- **Frames > Nameplates > Level** (tab): Position of the level number. *Before the Name* keeps DragonUI's layout.
+  *Outside the Bar, Left* and *Outside the Bar, Right* draw it beside the health bar, outside the
+  name. Whether the level shows at all is still set by DragonUI_Options' Level section.
+  Stored as `modules.nameplates.levelPlacement`.
+  *Style* picks Outline, Shadow or Outline & Shadow for the outside level text
+  (`modules.nameplates.extLevelStyle`).
 
 ## Notes
 
 - Requires DragonUI and DragonUI_Options (both listed as dependencies).
 - Depends on DragonUI internals (`_G.DragonUI`, `addon.VisibilityFade`, `addon.ForeverUI`,
-  `addon.PanelControls`). A DragonUI update that changes these may break this addon.
+  `addon.PanelControls`, `addon.Nameplates.layout.ApplyNameplateFonts` and `SafeSetFont`). A DragonUI
+  update that changes these may break this addon.
 - Nothing in DragonUI or DragonUI_Options is modified. The window uses DragonUI's own
   textures and fonts at runtime; nothing is copied into this addon.
 - Party frames are not included; their visibility is managed by DragonUI's own party rules.
