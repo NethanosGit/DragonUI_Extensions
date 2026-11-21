@@ -150,6 +150,32 @@ PAGES.level = {
             getFunc = function() return EXT.GetLevelStyle() end,
             setFunc = function(value) EXT.SetLevelStyle(value) end,
         })
+        C:AddSlider(section, {
+            label = "Font Size",
+            desc = "Font size of the level text drawn outside the bar (-3 to 10, default 2). The text is drawn at 4 + this value.",
+            min = -3, max = 10, step = 1,
+            width = 200,
+            getFunc = function() return EXT.GetLevelFontSize() end,
+            setFunc = function(value) EXT.SetLevelFontSize(value) end,
+        })
+        for _, entry in ipairs({
+            { "friendlyPlayer", "Use Difficulty Color for Friendly Players" },
+            { "friendlyNPC",    "Use Difficulty Color for Friendly NPC" },
+            { "enemyPlayer",    "Use Difficulty Color for Enemy Players" },
+            { "enemyNPC",       "Use Difficulty Color for Enemy NPC" },
+        }) do
+            local kind = entry[1]
+            C:AddToggle(section, {
+                label = entry[2],
+                getFunc = function() return EXT.GetLevelDifficultyColor(kind) end,
+                setFunc = function(value) EXT.SetLevelDifficultyColor(kind, value) end,
+            })
+        end
+        C:AddToggle(section, {
+            label = "Show Frame Under",
+            getFunc = function() return EXT.IsLevelFrameShown() end,
+            setFunc = function(value) EXT.SetLevelFrameShown(value) end,
+        })
     end,
 }
 
@@ -162,6 +188,7 @@ local NAMEPLATE_SUBTABS = {
     { key = "name",   label = "Name" },
     { key = "health", label = "Health" },
     { key = "level",  label = "Level" },
+    { key = "target", label = "Target" },
 }
 local activeNameplateSubTab = "name"
 
@@ -175,6 +202,28 @@ PAGES.nameplates = {
         end)
         local sub = PAGES[activeNameplateSubTab]
         if sub and sub.build then sub.build(container) end
+    end,
+}
+
+-- Target: how much bigger the current target's nameplate gets.
+PAGES.target = {
+    title = "Target",
+    build = function(container)
+        local C = DUI.PanelControls
+        C:AddDescription(container, "How much bigger the nameplate of your current target gets. 100% keeps it the same size.")
+        C:AddSpacer(container)
+
+        local section = C:AddSection(container, "Target Plate")
+        local limits = EXT.TARGET_SCALE_LIMITS
+        C:AddSlider(section, {
+            label = "Scale",
+            desc = "Scales everything on the target's nameplate (name, level, health, bars, frames): 100% = x1, 150% = x1.5.",
+            min = limits.min, max = limits.max, step = limits.step,
+            isPercent = true,
+            width = 200,
+            getFunc = function() return EXT.GetTargetScale() end,
+            setFunc = function(value) EXT.SetTargetScale(value) end,
+        })
     end,
 }
 

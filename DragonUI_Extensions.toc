@@ -8,4 +8,5 @@ TargetVisibility.lua
 NameplateName.lua
 NameplateHealthText.lua
 NameplateLevel.lua
+NameplateTarget.lua
 ExtensionsWindow.lua
