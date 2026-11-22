@@ -64,7 +64,59 @@ function EXT.SetNameCropDisabled(value)
     end
 end
 
+-- ============================================================================
+-- STYLE: outline and/or shadow for the name (retail draws it with a shadow, no outline)
+-- ============================================================================
+
+local STYLES = { none = true, outline = true, shadow = true, both = true }
+local DEFAULT_STYLE = "shadow"
+-- Retail's shadow falls to the right only (1.5px): no vertical offset.
+local SHADOW_X, SHADOW_Y = 1.5, 0
+
+function EXT.NormalizeTextStyle(value)
+    if STYLES[value] then return value end
+    return DEFAULT_STYLE
+end
+
+-- Puts the style on a font string, keeping its font and size.
+function EXT.ApplyTextStyle(fs, style, safeSetFont)
+    if not (fs and fs.GetFont) then return end
+    local path, size = fs:GetFont()
+    if not path then return end
+    local outline = (style == "outline" or style == "both")
+    local shadow = (style == "shadow" or style == "both")
+    safeSetFont(fs, path, size, outline and "OUTLINE" or "")
+    fs:SetShadowOffset(SHADOW_X, SHADOW_Y)
+    fs:SetShadowColor(0, 0, 0, shadow and 1 or 0)
+end
+
+function EXT.GetNameStyle()
+    local node = NameplateProfile()
+    return EXT.NormalizeTextStyle(node and node.extNameStyle)
+end
+
+function EXT.SetNameStyle(value)
+    local profile = DUI.db and DUI.db.profile
+    if not profile then return end
+    profile.modules = profile.modules or {}
+    profile.modules.nameplates = profile.modules.nameplates or {}
+    profile.modules.nameplates.extNameStyle = EXT.NormalizeTextStyle(value)
+    if DUI.RefreshNameplates then
+        DUI:RefreshNameplates()
+    end
+end
+
 local LAYOUT = DUI.Nameplates.layout
+if LAYOUT and type(LAYOUT.ApplyNameplateFonts) == "function" and type(LAYOUT.SafeSetFont) == "function" then
+    local origFonts = LAYOUT.ApplyNameplateFonts
+    function LAYOUT.ApplyNameplateFonts(plateData)
+        origFonts(plateData)
+        EXT.ApplyTextStyle(plateData and plateData.minaName, EXT.GetNameStyle(), LAYOUT.SafeSetFont)
+        -- A recycled plate may come back at the base size while still scaled (NameplateTarget.lua).
+        if EXT.UpdateNameScale then EXT.UpdateNameScale(plateData) end
+    end
+end
+
 if LAYOUT and type(LAYOUT.AnchorPlateName) == "function" then
     local origAnchor = LAYOUT.AnchorPlateName
     -- DragonUI anchors the name between two points, which fixes its width and crops long names.
@@ -81,6 +133,62 @@ if LAYOUT and type(LAYOUT.AnchorPlateName) == "function" then
         else
             name:SetJustifyH("LEFT")
             name:SetPoint("LEFT", row, "LEFT", leftInset or 0, 0)
+        end
+    end
+end
+
+-- ============================================================================
+-- VERTICAL OFFSET: moves the name row when the name sits above the bar (Modern frame)
+-- ============================================================================
+
+-- DragonUI only has a vertical offset for a name inside the bar. This one moves the row above the bar, which
+-- carries the name, the level and the health text beside it. Stored as modules.nameplates.extNameOffsetY.
+local MIN_OFFSET_Y, MAX_OFFSET_Y = -30, 30
+
+function EXT.GetNameOffsetY()
+    local node = NameplateProfile()
+    local v = math.floor((tonumber(node and node.extNameOffsetY) or 0) + 0.5)
+    if v < MIN_OFFSET_Y then return MIN_OFFSET_Y end
+    if v > MAX_OFFSET_Y then return MAX_OFFSET_Y end
+    return v
+end
+
+function EXT.SetNameOffsetY(value)
+    local profile = DUI.db and DUI.db.profile
+    if not profile then return end
+    profile.modules = profile.modules or {}
+    profile.modules.nameplates = profile.modules.nameplates or {}
+    profile.modules.nameplates.extNameOffsetY = math.max(MIN_OFFSET_Y, math.min(MAX_OFFSET_Y, math.floor((tonumber(value) or 0) + 0.5)))
+    -- DragonUI skips the layout pass while its own signature is unchanged: force it on the plates in view.
+    local NP = DUI.Nameplates
+    if NP.module and NP.module.plates then
+        for _, pd in pairs(NP.module.plates) do
+            pd._layoutSig = nil
+        end
+    end
+    if DUI.RefreshNameplates then
+        DUI:RefreshNameplates()
+    end
+end
+
+EXT.NAME_OFFSET_Y_LIMITS = { min = MIN_OFFSET_Y, max = MAX_OFFSET_Y, step = 1 }
+
+if LAYOUT and type(LAYOUT.LayoutMinaStack) == "function" then
+    local origStack = LAYOUT.LayoutMinaStack
+    function LAYOUT.LayoutMinaStack(plateData)
+        origStack(plateData)
+        local row = plateData and plateData.minaNameRow
+        local offset = EXT.GetNameOffsetY()
+        if not row or offset == 0 or DUI.Nameplates.config.IsNameOverlayBar() then return end
+        local n = row:GetNumPoints()
+        local pts = {}
+        for i = 1, n do
+            pts[i] = { row:GetPoint(i) }
+        end
+        row:ClearAllPoints()
+        for i = 1, n do
+            local p = pts[i]
+            row:SetPoint(p[1], p[2], p[3], p[4] or 0, (p[5] or 0) + offset)
         end
     end
 end

@@ -47,6 +47,11 @@ function EXT.SetLevelPlacement(value)
     end
 end
 
+-- The level uses DragonUI's nameplate font.
+local function LevelFontPath()
+    return NP.config.GetNameplateFont()
+end
+
 -- Outline / shadow style of the level text drawn outside the bar.
 -- Font size of the outside level text: drawn at LEVEL_FONT_BASE + the setting (default 2 = 6).
 local LEVEL_FONT_BASE = 4
@@ -69,7 +74,7 @@ local function LevelPixelSize()
     return LEVEL_FONT_BASE + EXT.GetLevelFontSize()
 end
 
-local STYLES = { outline = true, shadow = true, both = true }
+local STYLES = { none = true, outline = true, shadow = true, both = true }
 local DEFAULT_STYLE = "shadow"
 local levelPlates = setmetatable({}, { __mode = "k" })
 
@@ -91,7 +96,7 @@ function EXT.SetLevelStyle(value)
     for plateData in pairs(levelPlates) do
         plateData._extLevelFontKey = nil
         if plateData._extLevelFS and plateData.minaName then
-            local path = plateData.minaName:GetFont()
+            local path = LevelFontPath()
             if path then
                 local outline = (value == "outline" or value == "both")
                 local shadow = (value == "shadow" or value == "both")
@@ -186,7 +191,7 @@ end
 -- "Show Frame Under": a 10x10 box behind the level, drawn with the nameplate's own slices (dark
 -- capsule, target border, non-target wash) and its mouseover wash. The background is static: no
 -- tank tint and no fill. Target and hover follow the plate's own chrome.
-local BOX_SIZE = 11
+local BOX_SIZE = 12
 local CAVITY = 10
 local MOUSEOVER_TEX = "Interface\\TargetingFrame\\UI-TargetingFrame-BarFill"
 local MOUSEOVER_ALPHA = 0.25
@@ -215,7 +220,16 @@ local A = NP.atlas
 local function SyncBoxState(box, plateData)
     local sel, desel = plateData._retailSelected, plateData._retailDeselected
     local mo = plateData._retailMouseover
-    if sel and sel.shown then A.ShowSlice(box.selected) else A.HideSlice(box.selected) end
+    if sel and sel.shown then
+        -- Same colour as the target highlight on the plate (Target tab); NameplateTarget.lua defines it.
+        if EXT.GetTargetHighlightColor then
+            local r, g, b = EXT.GetTargetHighlightColor()
+            A.SetSliceVertexColor(box.selected, r, g, b, 1)
+        end
+        A.ShowSlice(box.selected)
+    else
+        A.HideSlice(box.selected)
+    end
     if desel and desel.shown then A.ShowSlice(box.deselected) else A.HideSlice(box.deselected) end
     if mo and mo:IsShown() then box.mo:Show() else box.mo:Hide() end
 end
@@ -303,8 +317,8 @@ local function UpdateLevelText(plateData)
     end
     box:Show()
 
-    -- Same font as the name, at the Font Size setting; the outline and shadow follow the Style setting.
-    local path = name:GetFont()
+    -- DragonUI's nameplate font, at the Font Size setting; the outline and shadow follow the Style setting.
+    local path = LevelFontPath()
     if path then
         local style = EXT.GetLevelStyle()
         local key = path .. "|" .. LevelPixelSize() .. "|" .. style

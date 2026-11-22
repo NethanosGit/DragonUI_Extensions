@@ -49,6 +49,22 @@ function EXT.SetHealthTextSize(value)
     end
 end
 
+function EXT.GetHealthStyle()
+    local node = NameplateProfile()
+    return EXT.NormalizeTextStyle and EXT.NormalizeTextStyle(node and node.extHealthStyle) or "shadow"
+end
+
+function EXT.SetHealthStyle(value)
+    local profile = DUI.db and DUI.db.profile
+    if not profile then return end
+    profile.modules = profile.modules or {}
+    profile.modules.nameplates = profile.modules.nameplates or {}
+    profile.modules.nameplates.extHealthStyle = EXT.NormalizeTextStyle(value)
+    if DUI.RefreshNameplates then
+        DUI:RefreshNameplates()
+    end
+end
+
 -- The core sizes the health text as 7 + the setting in Heritage, and as the name in Modern.
 -- Re-apply the health text size after the core's pass, keeping the font path and outline it chose.
 local origApply = LAYOUT.ApplyNameplateFonts
@@ -63,5 +79,10 @@ function LAYOUT.ApplyNameplateFonts(plateData)
                 LAYOUT.SafeSetFont(fs, path, px, flags)
             end
         end
+    end
+    -- Outline / shadow style, on every health text.
+    local style = EXT.GetHealthStyle()
+    for _, key in ipairs({ "minaHpNum", "minaHpBarPct", "minaHpPct" }) do
+        EXT.ApplyTextStyle(plateData and plateData[key], style, LAYOUT.SafeSetFont)
     end
 end

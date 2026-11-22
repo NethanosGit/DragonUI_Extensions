@@ -59,6 +59,31 @@ local SNAP = 0.002
 
 local origSetScale = LAYOUT.SetRetailPlateScale
 
+-- The name only follows this share of the extra target scale: a plate scaled x1.5 draws its name at
+-- x1.375. SetScale on the plate scales the name too, so its font size is shrunk to compensate.
+local NAME_SCALE_SHARE = 0.75
+
+function EXT.UpdateNameScale(pd)
+    local fs = pd and pd.minaName
+    if not (fs and fs.GetFont and LAYOUT.SafeSetFont) then return end
+    local path, size, flags = fs:GetFont()
+    if not path or not size then return end
+    -- A size we did not set is DragonUI's (or the Name setting's) new base size.
+    if not pd._extNameSet or math.abs(size - pd._extNameSet) > 0.01 then
+        pd._extNameBase = size
+    end
+    local extra = pd._extExtra or 1
+    local m = 1
+    if extra > 1 then
+        m = (1 + NAME_SCALE_SHARE * (extra - 1)) / extra
+    end
+    local want = pd._extNameBase * m
+    if math.abs(size - want) > 0.01 then
+        LAYOUT.SafeSetFont(fs, path, want, flags)
+    end
+    pd._extNameSet = want
+end
+
 -- DragonUI asks for a scale; the extra target scale is multiplied in and becomes the goal that the
 -- animation below walks towards.
 function LAYOUT.SetRetailPlateScale(plateData, scale)
@@ -67,6 +92,7 @@ function LAYOUT.SetRetailPlateScale(plateData, scale)
         return origSetScale(plateData, scale)
     end
     -- A scale deferred during combat is replayed by DragonUI with the extra scale already in it.
+    plateData._extBase = scale
     if plateData._extPendingScale == scale then
         plateData._extPendingScale = nil
         return origSetScale(plateData, scale)
@@ -107,6 +133,8 @@ driver:SetScript("OnUpdate", function(_, elapsed)
                         nextScale = goal
                     end
                     origSetScale(pd, nextScale)
+                    pd._extExtra = nextScale / (pd._extBase or 1)
+                    EXT.UpdateNameScale(pd)
                     pd._extPendingScale = pd._pendingRetailScale and nextScale or nil
                     current = nextScale
                 end
@@ -117,3 +145,46 @@ driver:SetScript("OnUpdate", function(_, elapsed)
         end
     end
 end)
+
+-- ============================================================================
+-- TARGET HIGHLIGHT COLOUR: tints the white glow DragonUI draws on the current target
+-- ============================================================================
+
+-- Stored as modules.nameplates.extTargetHighlightColor = { r, g, b }; nil keeps DragonUI's white.
+function EXT.GetTargetHighlightColor()
+    local node = NameplateProfile()
+    local c = node and node.extTargetHighlightColor
+    if type(c) == "table" then
+        return c.r or c[1] or 1, c.g or c[2] or 1, c.b or c[3] or 1
+    end
+    return 1, 1, 1
+end
+
+function EXT.SetTargetHighlightColor(r, g, b)
+    local profile = DUI.db and DUI.db.profile
+    if not profile then return end
+    profile.modules = profile.modules or {}
+    profile.modules.nameplates = profile.modules.nameplates or {}
+    profile.modules.nameplates.extTargetHighlightColor = { r = r or 1, g = g or 1, b = b or 1 }
+    if DUI.RefreshNameplates then
+        DUI:RefreshNameplates()
+    end
+end
+
+if type(NP.gather) == "table" and type(NP.gather.SyncTargetHighlight) == "function" then
+    local origHighlight = NP.gather.SyncTargetHighlight
+    function NP.gather.SyncTargetHighlight(plateData, isTargeted)
+        origHighlight(plateData, isTargeted)
+        if not plateData then return end
+        local r, g, b = EXT.GetTargetHighlightColor()
+        -- Non-retail glow texture, and the retail skin's selection border (nine slices).
+        local target = plateData.minaTarget
+        if target and target.tex then
+            target.tex:SetVertexColor(r, g, b)
+        end
+        local slice = plateData._retailSelected
+        if slice and NP.atlas and NP.atlas.SetSliceVertexColor then
+            NP.atlas.SetSliceVertexColor(slice, r, g, b, 1)
+        end
+    end
+end

@@ -67,6 +67,31 @@ function EXT.SetRaidMarkerSide(value)
     Refresh()
 end
 
+local MIN_SIZE, MAX_SIZE = 8, 64
+
+function EXT.GetRaidMarkerSize()
+    local node = NameplateProfile()
+    local v = tonumber(node and node.extRaidMarkerSize)
+    if not v then
+        local C = NP.const or {}
+        return C.RAID_MARKER_SIZE or 24
+    end
+    v = math.floor(v + 0.5)
+    if v < MIN_SIZE then return MIN_SIZE end
+    if v > MAX_SIZE then return MAX_SIZE end
+    return v
+end
+
+function EXT.SetRaidMarkerSize(value)
+    local node = WriteNode()
+    if not node then return end
+    value = math.floor((tonumber(value) or 24) + 0.5)
+    if value < MIN_SIZE then value = MIN_SIZE elseif value > MAX_SIZE then value = MAX_SIZE end
+    node.extRaidMarkerSize = value
+    Refresh()
+end
+
+EXT.RAID_MARKER_SIZE_LIMITS = { min = MIN_SIZE, max = MAX_SIZE, step = 1 }
 EXT.RAID_MARKER_X_LIMITS = { min = MIN_X, max = MAX_X, step = 1 }
 
 local origReflow = NP.widgets.ReflowTopOverlays
@@ -78,20 +103,34 @@ function NP.widgets.ReflowTopOverlays(plateData)
 
     local offset = EXT.GetRaidMarkerOffsetX()
     local mirror = EXT.GetRaidMarkerSide() == "left"
-    if offset == 0 and not mirror then return end
+    local C = NP.const or {}
+    local defaultSize = C.RAID_MARKER_SIZE or 24
+    local size = EXT.GetRaidMarkerSize()
+    local resize = size ~= defaultSize
+    if offset == 0 and not mirror and not resize then return end
 
     local point, relativeTo, relativePoint, x, y = native:GetPoint(1)
     -- Only the plain "TOP of the bar" anchor; headline mode anchors to the name and is left alone.
     if point ~= "TOP" or relativeTo ~= hp then return end
 
-    -- The beside layout is the only one with a large positive x; mirror it for the left side.
-    if mirror and x and x > 0 then
-        local C = NP.const or {}
-        local base = C.RAID_MARKER_OFFSET_X or 0
-        if x ~= base then
+    -- The beside layout is the only one with a large positive x. Keep its gap to the bar edge when the
+    -- size changes (the marker is centred, so half the growth goes outwards), then mirror for the left side.
+    local beside = x and x > 0 and x ~= (C.RAID_MARKER_OFFSET_X or 0)
+    if beside then
+        x = x + (size - defaultSize) * 0.5
+        if mirror then
             x = -x
         end
     end
+    if resize then
+        native:SetSize(size, size)
+    end
     native:ClearAllPoints()
-    native:SetPoint(point, relativeTo, relativePoint, (x or 0) + offset, y or 0)
+    if beside then
+        -- Beside the bar: always centred on the bar's middle, whatever the size.
+        native:SetPoint("CENTER", hp, "CENTER", x + offset, 0)
+    else
+        -- Above the bar: a TOP anchor would move the marker's centre when the size changes; keep it.
+        native:SetPoint(point, relativeTo, relativePoint, (x or 0) + offset, (y or 0) + (size - defaultSize) * 0.5)
+    end
 end

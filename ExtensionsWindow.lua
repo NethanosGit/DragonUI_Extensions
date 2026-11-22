@@ -102,6 +102,15 @@ PAGES.name = {
             getFunc = function() return EXT.GetNameStyle() end,
             setFunc = function(value) EXT.SetNameStyle(value) end,
         })
+        local offsetLimits = EXT.NAME_OFFSET_Y_LIMITS
+        C:AddSlider(section, {
+            label = "Vertical Offset",
+            desc = "Moves the name row (name, level and health text beside it) up or down while the name is above the bar, as in the Modern frame. A name inside the bar uses DragonUI's own Vertical Offset.",
+            min = offsetLimits.min, max = offsetLimits.max, step = offsetLimits.step,
+            width = 200,
+            getFunc = function() return EXT.GetNameOffsetY() end,
+            setFunc = function(value) EXT.SetNameOffsetY(value) end,
+        })
         C:AddToggle(section, {
             label = "Ignore Nameplate Width",
             getFunc = function() return EXT.IsNameCropDisabled() end,
@@ -252,6 +261,14 @@ PAGES.target = {
             getFunc = function() return EXT.GetTargetScale() end,
             setFunc = function(value) EXT.SetTargetScale(value) end,
         })
+
+        local highlight = C:AddSection(container, "Target Highlight")
+        C:AddColorPicker(highlight, {
+            label = "Highlight Color",
+            desc = "Color of the glow on your current target's nameplate (Show Target Highlight in DragonUI Options). White is the default.",
+            getFunc = function() return EXT.GetTargetHighlightColor() end,
+            setFunc = function(r, g, b) EXT.SetTargetHighlightColor(r, g, b) end,
+        })
     end,
 }
 
@@ -280,6 +297,15 @@ PAGES.icons = {
             width = 200,
             getFunc = function() return EXT.GetRaidMarkerOffsetX() end,
             setFunc = function(value) EXT.SetRaidMarkerOffsetX(value) end,
+        })
+        local sizeLimits = EXT.RAID_MARKER_SIZE_LIMITS
+        C:AddSlider(section, {
+            label = "Size",
+            desc = "Size of the raid marker in pixels (DragonUI's default is 24).",
+            min = sizeLimits.min, max = sizeLimits.max, step = sizeLimits.step,
+            width = 200,
+            getFunc = function() return EXT.GetRaidMarkerSize() end,
+            setFunc = function(value) EXT.SetRaidMarkerSize(value) end,
         })
     end,
 }
