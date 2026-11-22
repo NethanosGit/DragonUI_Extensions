@@ -89,6 +89,19 @@ PAGES.name = {
             getFunc = function() return EXT.GetNameSize() end,
             setFunc = function(value) EXT.SetNameSize(value) end,
         })
+        C:AddDropdown(section, {
+            label = "Style",
+            desc = "Outline and shadow of the name text. Retail uses a shadow with no outline.",
+            values = {
+                none    = "None",
+                outline = "Outline",
+                shadow  = "Shadow",
+                both    = "Outline & Shadow",
+            },
+            width = 260,
+            getFunc = function() return EXT.GetNameStyle() end,
+            setFunc = function(value) EXT.SetNameStyle(value) end,
+        })
         C:AddToggle(section, {
             label = "Ignore Nameplate Width",
             getFunc = function() return EXT.IsNameCropDisabled() end,
@@ -113,6 +126,19 @@ PAGES.health = {
             width = 200,
             getFunc = function() return EXT.GetHealthTextSize() end,
             setFunc = function(value) EXT.SetHealthTextSize(value) end,
+        })
+        C:AddDropdown(section, {
+            label = "Style",
+            desc = "Outline and shadow of the health text. Retail uses a shadow with no outline.",
+            values = {
+                none    = "None",
+                outline = "Outline",
+                shadow  = "Shadow",
+                both    = "Outline & Shadow",
+            },
+            width = 260,
+            getFunc = function() return EXT.GetHealthStyle() end,
+            setFunc = function(value) EXT.SetHealthStyle(value) end,
         })
     end,
 }
@@ -142,6 +168,7 @@ PAGES.level = {
             label = "Style",
             desc = "Outline and shadow of the level text. Applies when the level is drawn outside the bar; inside the name it shares the name's style.",
             values = {
+                none    = "None",
                 outline = "Outline",
                 shadow  = "Shadow",
                 both    = "Outline & Shadow",
@@ -189,6 +216,7 @@ local NAMEPLATE_SUBTABS = {
     { key = "health", label = "Health" },
     { key = "level",  label = "Level" },
     { key = "target", label = "Target" },
+    { key = "icons",  label = "Icons" },
 }
 local activeNameplateSubTab = "name"
 
@@ -223,6 +251,35 @@ PAGES.target = {
             width = 200,
             getFunc = function() return EXT.GetTargetScale() end,
             setFunc = function(value) EXT.SetTargetScale(value) end,
+        })
+    end,
+}
+
+-- Icons: raid marker position.
+PAGES.icons = {
+    title = "Icons",
+    build = function(container)
+        local C = DUI.PanelControls
+        C:AddDescription(container, "Move the raid marker on nameplates. Turn on Beside Bar Layout in DragonUI Options > Nameplates > Icons to place it beside the bar.")
+        C:AddSpacer(container)
+
+        local section = C:AddSection(container, "Raid Marker")
+        local limits = EXT.RAID_MARKER_X_LIMITS
+        C:AddDropdown(section, {
+            label = "Beside Bar Side",
+            desc = "Which edge of the bar the marker sits on when Beside Bar Layout is on.",
+            values = { left = "Left", right = "Right" },
+            width = 220,
+            getFunc = function() return EXT.GetRaidMarkerSide() end,
+            setFunc = function(value) EXT.SetRaidMarkerSide(value) end,
+        })
+        C:AddSlider(section, {
+            label = "Horizontal Offset",
+            desc = "Moves the raid marker left (negative) or right (positive). Works in every layout.",
+            min = limits.min, max = limits.max, step = limits.step,
+            width = 200,
+            getFunc = function() return EXT.GetRaidMarkerOffsetX() end,
+            setFunc = function(value) EXT.SetRaidMarkerOffsetX(value) end,
         })
     end,
 }

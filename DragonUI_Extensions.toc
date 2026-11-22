@@ -9,4 +9,5 @@ NameplateName.lua
 NameplateHealthText.lua
 NameplateLevel.lua
 NameplateTarget.lua
+NameplateIcons.lua
 ExtensionsWindow.lua
