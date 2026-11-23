@@ -310,10 +310,29 @@ PAGES.icons = {
     end,
 }
 
+-- Bagster: sectioned inventory instead of category tabs.
+PAGES.bagster = {
+    title = "Bagster",
+    build = function(container)
+        local C = DUI.PanelControls
+        C:AddDescription(container, "Replaces the category tabs on the Bagster inventory with sections: Hearthstone, Potion, Food, Consumable, Devices and Quest on top, then Equipment (Armor, Weapon, Trinket), Crafting, Miscellaneous and Empty. The rarity filter stays. Needs the Bagster module on in DragonUI. The bank is not changed.")
+        C:AddSpacer(container)
+
+        local section = C:AddSection(container, "Inventory")
+        C:AddToggle(section, {
+            label = "Sectioned Layout",
+            desc = "Show the inventory split into sections instead of using the category tabs.",
+            getFunc = function() return EXT.IsBagsterSections() end,
+            setFunc = function(value) EXT.SetBagsterSections(value) end,
+        })
+    end,
+}
+
 -- Sidebar categories, in order. Each tab key is a PAGES key.
 local CATEGORIES = {
     { label = "Frames", tabs = { "units", "nameplates" } },
     { label = "Bars",   tabs = { "bars", "additional", "xprep" } },
+    { label = "Bags",   tabs = { "bagster" } },
 }
 
 local tabButtons = {}
