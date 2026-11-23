@@ -103,14 +103,66 @@ local function Clamp01(value)
     return value
 end
 
+local FADE_PATH = "extensions.target_fade_duration"
+local FADE_DEFAULT = 0.35
+local FADE_LIMITS = { min = 0, max = 2, step = 0.05 }
+
+-- Seconds, used for both fade-in and fade-out. 0 snaps with no animation.
+local function GetFadeDuration()
+    local v = tonumber(GetProfileValue(FADE_PATH))
+    if not v then return FADE_DEFAULT end
+    return math.min(FADE_LIMITS.max, math.max(FADE_LIMITS.min, v))
+end
+
+local fadeDrivers = {} -- visibility key -> frame running the OnUpdate fade
+
+local function SetAlphaAll(rec, alpha)
+    rec.frame:SetAlpha(alpha)
+    if rec.opts.frames then
+        for _, f in ipairs(rec.opts.frames) do
+            if f then f:SetAlpha(alpha) end
+        end
+    end
+end
+
+local function FadeTo(key, rec, targetAlpha)
+    local driver = fadeDrivers[key]
+    if not driver then
+        driver = CreateFrame("Frame")
+        fadeDrivers[key] = driver
+    end
+    driver:SetScript("OnUpdate", nil)
+
+    local duration = GetFadeDuration()
+    local fromAlpha = rec.frame:GetAlpha() or 1
+    if duration <= 0 or math.abs(fromAlpha - targetAlpha) <= 0.01 then
+        SetAlphaAll(rec, targetAlpha)
+        return
+    end
+
+    local elapsed = 0
+    driver:SetScript("OnUpdate", function(self, dt)
+        elapsed = elapsed + dt
+        local progress = elapsed / duration
+        if progress >= 1 then
+            self:SetScript("OnUpdate", nil)
+            SetAlphaAll(rec, targetAlpha)
+        else
+            SetAlphaAll(rec, fromAlpha + (targetAlpha - fromAlpha) * progress)
+        end
+    end)
+end
+
 local function UpdateTargetMode(key, rec, cfg)
     local shouldShow = (not cfg.always_hidden) and UnitExists("target") and true or false
     local shownAlpha = Clamp01(cfg.visibility_shown_alpha == nil and 1 or cfg.visibility_shown_alpha)
     local hiddenAlpha = Clamp01(cfg.visibility_hidden_alpha == nil and 0 or cfg.visibility_hidden_alpha)
 
-    -- Reset stops any fade the engine still has running for this key, then snaps alpha.
-    -- The engine is never asked to update this key while the mode is active, so it cannot fight us.
-    VF.Reset(key, shouldShow and shownAlpha or hiddenAlpha)
+    -- Reset stops any fade the engine still has running for this key (holding the current alpha so
+    -- nothing jumps); our own 0.5s fade then takes over. The engine is never asked to update this
+    -- key while the mode is active, so it cannot fight us.
+    VF.Reset(key, rec.frame:GetAlpha() or 1)
+    FadeTo(key, rec, shouldShow and shownAlpha or hiddenAlpha)
 
     -- Click-through frames must not eat clicks while invisible.
     local opts = rec.opts
@@ -139,6 +191,8 @@ function VF.Update(key)
             SetProfileValue(rec.prefix .. FLAG, false)
         end
     end
+    -- Not in target mode (any more): stop our fade so it cannot fight the engine's.
+    if fadeDrivers[key] then fadeDrivers[key]:SetScript("OnUpdate", nil) end
     return origUpdate(key)
 end
 
@@ -163,6 +217,19 @@ _G.DragonUIExtensions = EXT
 -- prefix: a settings prefix from the tables above, e.g. "unitframe.player." or "actionbars.main_".
 function EXT.GetShowOnTarget(prefix)
     return FlagOn(prefix, FLAG)
+end
+
+EXT.TARGET_FADE_LIMITS = FADE_LIMITS
+
+function EXT.GetTargetFadeDuration()
+    return GetFadeDuration()
+end
+
+function EXT.SetTargetFadeDuration(value)
+    value = tonumber(value) or FADE_DEFAULT
+    -- Snap to the step in whole hundredths so float error (0.35000000000000003) never gets stored.
+    value = math.floor(value * 100 / (FADE_LIMITS.step * 100) + 0.5) * (FADE_LIMITS.step * 100) / 100
+    SetProfileValue(FADE_PATH, math.min(FADE_LIMITS.max, math.max(FADE_LIMITS.min, value)))
 end
 
 -- Turning it on also turns off the other three visibility modes for that entry.

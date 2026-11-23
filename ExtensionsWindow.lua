@@ -359,6 +359,17 @@ local function BuildPage(container, page)
             setFunc = function(value) EXT.SetShowOnTarget(prefix, value) end,
         })
     end
+
+    local fade = C:AddSection(container, "Fade")
+    local limits = EXT.TARGET_FADE_LIMITS
+    C:AddSlider(fade, {
+        label = "Fade Duration",
+        desc = "Seconds the fade in and fade out take when you gain or lose a target (0 to 2 in steps of 0.05, default 0.35, 0 = instant). Shared by every Show on Target frame and bar.",
+        min = limits.min, max = limits.max, step = limits.step,
+        width = 200,
+        getFunc = function() return EXT.GetTargetFadeDuration() end,
+        setFunc = function(value) EXT.SetTargetFadeDuration(value) end,
+    })
 end
 
 local function ReleaseScroll()
