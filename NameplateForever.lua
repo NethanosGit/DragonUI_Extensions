@@ -438,10 +438,25 @@ function NP.widgets.SyncEliteIcon(plateData, ...)
     return origElite(plateData, ...)
 end
 
+-- DragonUI centres the health text on the bar, which looks low on the thin art: raise it.
+local function RaiseHealthText(fs)
+    if not fs then return end
+    local points = {}
+    for i = 1, fs:GetNumPoints() do points[i] = { fs:GetPoint(i) } end
+    fs:ClearAllPoints()
+    for _, p in ipairs(points) do
+        fs:SetPoint(p[1], p[2], p[3], p[4] or 0, 0.5)
+    end
+end
+
 -- The name sits 2 units above the bar instead of DragonUI's 3.
 local origStack = NP.layout.LayoutMinaStack
 function NP.layout.LayoutMinaStack(plateData, ...)
     origStack(plateData, ...)
+    if plateData and IsForever() then
+        RaiseHealthText(plateData.minaHpNum)
+        RaiseHealthText(plateData.minaHpBarPct)
+    end
     local row = plateData and plateData.minaNameRow
     if not row or not IsForever() or NP.config.IsNameOverlayBar() then return end
     local points = {}
