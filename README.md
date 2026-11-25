@@ -6,10 +6,15 @@ Extra options for [DragonUI](../DragonUI), loaded as a separate addon.
 
 - **Show on Target** for unit frames (Player, Target, Focus, Pet, Boss), action bars (Main,
   Right, Left, Bottom Left, Bottom Right), additional bars (Stance, Pet, Totem, Extra Bar 1) and
-  XP & Rep bars. When on, the entry is shown while a target exists and
-  hidden otherwise. It is exclusive with DragonUI's *Show on Hover Only*, *Show in Combat Only*
-  and *Hide in Combat* for that entry.
+  XP & Rep bars. When on, the entry is shown while a target exists. It combines with
+  DragonUI's *Show on Hover Only* and *Show in Combat Only*: the entry is shown when any checked
+  condition is met, and DragonUI's *Hover/Combat Logic* is treated as OR. It is exclusive with
+  *Hide in Combat* for that entry.
   - Open the settings window with `/duiext`.
+- **Frames > Player Auras**: *Show on Hover*, *Show in Combat* and *Show on Target* for your buffs,
+  debuffs and weapon enchants, as one group. Any checked condition shows them; with none checked
+  they are always shown. Hidden auras ignore the mouse. Stored in DragonUI's profile under
+  `extensions.auras`.
 - **Frames > Nameplates > Style** (tab): *WoW Forever (Thin)* nameplate art, ported from
   [DragonUI pull request #586](https://github.com/NeticSoul/DragonUI/pull/586): the original
   borders, focus ring, cast bar and level badge. Only the art changes; sizes, fonts, text placement

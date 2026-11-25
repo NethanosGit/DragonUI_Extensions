@@ -1,12 +1,14 @@
 -- DragonUI_Extensions: "Show on Target" visibility mode for DragonUI's unit frames and action bars.
 --
--- When enabled for a frame or bar, it is shown while a target exists and hidden otherwise.
--- It is exclusive with DragonUI's "Show on Hover Only", "Show in Combat Only" and "Hide in Combat".
+-- When enabled for a frame or bar, it is shown while a target exists. It combines with DragonUI's
+-- "Show on Hover Only" and "Show in Combat Only": any one of the conditions shows the entry.
+-- It is exclusive with "Hide in Combat".
 -- The option is set in the standalone window (/duiext, see ExtensionsWindow.lua).
 --
 -- Relies on DragonUI internals: _G.DragonUI, addon.VisibilityFade (Register / Update / Reset).
--- Nothing in DragonUI or DragonUI_Options is modified. The engine's rules are left untouched for
--- every other combination; this file only takes over an entry while "Show on Target" is the sole mode.
+-- Nothing in DragonUI or DragonUI_Options is modified. While "Show on Target" is on, this file
+-- shows the entry itself when there is a target (or no other mode is set) and otherwise leaves
+-- hover/combat to the engine, with its AND/OR logic read as OR.
 
 local DUI = _G.DragonUI
 if not (DUI and DUI.VisibilityFade) then return end
@@ -38,6 +40,8 @@ local BAR_PREFIX = {
     extrabar1    = "additional.extrabar1.",
     -- XP and Rep share one config table.
     xprepbar     = "xprepbar.",
+    -- Registered by AuraVisibility.lua.
+    playerauras  = "extensions.auras.",
 }
 
 local function PrefixOf(key)
@@ -73,8 +77,12 @@ local function FlagOn(prefix, name)
     return GetProfileValue(prefix .. name) == true
 end
 
-local function OtherModeOn(prefix)
-    return FlagOn(prefix, "show_on_hover") or FlagOn(prefix, "show_in_combat") or FlagOn(prefix, "hide_in_combat")
+local function HoverOrCombatOn(prefix)
+    return FlagOn(prefix, "show_on_hover") or FlagOn(prefix, "show_in_combat")
+end
+
+local function TargetModeOn(prefix)
+    return FlagOn(prefix, FLAG) and not FlagOn(prefix, "hide_in_combat")
 end
 
 -- ============================================================================
@@ -85,11 +93,27 @@ local records = {} -- visibility key -> { frame, opts, prefix }
 
 local origRegister = VF.Register
 function VF.Register(key, frame, opts)
-    origRegister(key, frame, opts)
     local prefix = PrefixOf(key)
-    if prefix and frame and opts and opts.dbTable then
-        records[key] = { frame = frame, opts = opts, prefix = prefix }
+    if not (prefix and frame and opts and opts.dbTable) then
+        return origRegister(key, frame, opts)
     end
+
+    -- The engine gets a copy of opts whose config reads the hover/combat logic as OR while target
+    -- mode is on. The config is copied too, since it can be DragonUI's own profile table.
+    local wrapped = {}
+    for k, v in pairs(opts) do wrapped[k] = v end
+    local dbTable = opts.dbTable
+    wrapped.dbTable = function()
+        local cfg = dbTable()
+        if not (cfg and TargetModeOn(prefix)) then return cfg end
+        local copy = {}
+        for k, v in pairs(cfg) do copy[k] = v end
+        copy.visibility_logic = "or"
+        return copy
+    end
+
+    origRegister(key, frame, wrapped)
+    records[key] = { frame = frame, opts = opts, prefix = prefix }
 end
 
 -- ============================================================================
@@ -162,10 +186,12 @@ local function UpdateTargetMode(key, rec, cfg)
     -- nothing jumps); our own 0.5s fade then takes over. The engine is never asked to update this
     -- key while the mode is active, so it cannot fight us.
     VF.Reset(key, rec.frame:GetAlpha() or 1)
+    local opts = rec.opts
+    -- The main bar uses this to bring its buttons back, as the engine does on every reveal.
+    if shouldShow and opts.onVisibilityChange then opts.onVisibilityChange(true) end
     FadeTo(key, rec, shouldShow and shownAlpha or hiddenAlpha)
 
     -- Click-through frames must not eat clicks while invisible.
-    local opts = rec.opts
     if opts.clickThrough then
         local inCombat = InCombatLockdown()
         for _, f in ipairs(opts.hoverFrames or { rec.frame }) do
@@ -183,15 +209,17 @@ function VF.Update(key)
         -- Some bars return no config while disabled; those are left to the engine.
         local cfg = rec.opts.dbTable and rec.opts.dbTable()
         if cfg then
-            if not OtherModeOn(rec.prefix) then
+            if FlagOn(rec.prefix, "hide_in_combat") then
+                -- Switched on elsewhere. Drop the stale flag so this mode cannot come back on
+                -- its own later.
+                SetProfileValue(rec.prefix .. FLAG, false)
+            elseif UnitExists("target") or not HoverOrCombatOn(rec.prefix) then
                 return UpdateTargetMode(key, rec, cfg)
             end
-            -- Another mode was switched on elsewhere. Drop the stale flag so this mode cannot
-            -- come back on its own later.
-            SetProfileValue(rec.prefix .. FLAG, false)
         end
     end
-    -- Not in target mode (any more): stop our fade so it cannot fight the engine's.
+    -- Hover/combat decide (no target, or target mode off): stop our fade so it cannot fight the
+    -- engine's.
     if fadeDrivers[key] then fadeDrivers[key]:SetScript("OnUpdate", nil) end
     return origUpdate(key)
 end
@@ -201,7 +229,7 @@ local targetEvents = CreateFrame("Frame")
 targetEvents:RegisterEvent("PLAYER_TARGET_CHANGED")
 targetEvents:SetScript("OnEvent", function()
     for key, rec in pairs(records) do
-        if FlagOn(rec.prefix, FLAG) and not OtherModeOn(rec.prefix) then
+        if TargetModeOn(rec.prefix) then
             VF.Update(key)
         end
     end
@@ -213,6 +241,9 @@ end)
 
 local EXT = _G.DragonUIExtensions or {}
 _G.DragonUIExtensions = EXT
+
+EXT.GetProfileValue = GetProfileValue
+EXT.SetProfileValue = SetProfileValue
 
 -- prefix: a settings prefix from the tables above, e.g. "unitframe.player." or "actionbars.main_".
 function EXT.GetShowOnTarget(prefix)
@@ -232,12 +263,10 @@ function EXT.SetTargetFadeDuration(value)
     SetProfileValue(FADE_PATH, math.min(FADE_LIMITS.max, math.max(FADE_LIMITS.min, value)))
 end
 
--- Turning it on also turns off the other three visibility modes for that entry.
+-- Turning it on also turns off "Hide in Combat" for that entry; hover and combat are kept.
 function EXT.SetShowOnTarget(prefix, value)
     if value then
-        for _, name in ipairs({ "show_on_hover", "show_in_combat", "hide_in_combat" }) do
-            SetProfileValue(prefix .. name, false)
-        end
+        SetProfileValue(prefix .. "hide_in_combat", false)
     end
     SetProfileValue(prefix .. FLAG, value and true or false)
     for key, rec in pairs(records) do

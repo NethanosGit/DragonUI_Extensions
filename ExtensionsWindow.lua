@@ -370,9 +370,43 @@ PAGES.bagster = {
     end,
 }
 
+-- Auras: when the player's buffs, debuffs and weapon enchants are shown (AuraVisibility.lua).
+PAGES.auras = {
+    title = "Player Auras",
+    build = function(container)
+        local C = DUI.PanelControls
+        if not EXT.SetAuraMode then
+            C:AddDescription(container, "Aura visibility does not work with this version of DragonUI.")
+            return
+        end
+        C:AddDescription(container, "When your buffs, debuffs and weapon enchants are shown. Any checked condition shows them. With nothing checked they are always shown.")
+        C:AddSpacer(container)
+
+        local section = C:AddSection(container, "Visibility")
+        C:AddToggle(section, {
+            label = "Show on Hover",
+            desc = "Show your auras while the mouse is over them.",
+            getFunc = function() return EXT.GetAuraMode("show_on_hover") end,
+            setFunc = function(value) EXT.SetAuraMode("show_on_hover", value) end,
+        })
+        C:AddToggle(section, {
+            label = "Show in Combat",
+            desc = "Show your auras while you are in combat.",
+            getFunc = function() return EXT.GetAuraMode("show_in_combat") end,
+            setFunc = function(value) EXT.SetAuraMode("show_in_combat", value) end,
+        })
+        C:AddToggle(section, {
+            label = "Show on Target",
+            desc = "Show your auras while a target is selected.",
+            getFunc = function() return EXT.GetShowOnTarget(EXT.AURA_PREFIX) end,
+            setFunc = function(value) EXT.SetShowOnTarget(EXT.AURA_PREFIX, value) end,
+        })
+    end,
+}
+
 -- Sidebar categories, in order. Each tab key is a PAGES key.
 local CATEGORIES = {
-    { label = "Frames", tabs = { "units", "nameplates" } },
+    { label = "Frames", tabs = { "units", "auras", "nameplates" } },
     { label = "Bars",   tabs = { "bars", "additional", "xprep" } },
     { label = "Bags",   tabs = { "bagster" } },
 }
@@ -388,7 +422,7 @@ local function BuildPage(container, page)
         return page.build(container)
     end
     local C = DUI.PanelControls
-    C:AddDescription(container, "Show a frame only while you have a target selected. Turning it on turns off hover and combat visibility for that frame.")
+    C:AddDescription(container, "Show a frame while you have a target selected. It combines with Show on Hover Only and Show in Combat Only from DragonUI Options: any one of them shows the frame. Turning it on turns off Hide in Combat.")
     C:AddSpacer(container)
 
     local section = C:AddSection(container, "Show on Target")
@@ -396,7 +430,7 @@ local function BuildPage(container, page)
         local prefix = item.prefix
         C:AddToggle(section, {
             label = item.label,
-            desc = "Show this only while a target is selected.",
+            desc = "Show this while a target is selected.",
             getFunc = function() return EXT.GetShowOnTarget(prefix) end,
             setFunc = function(value) EXT.SetShowOnTarget(prefix, value) end,
         })
