@@ -121,6 +121,34 @@ function EXT.SetLevelFontSize(value)
     EXT.SetLevelStyle(EXT.GetLevelStyle())
 end
 
+-- Horizontal offset of the outside level (text, frame and Forever badge): negative is left.
+local MIN_OFFSET_X, MAX_OFFSET_X = -50, 50
+
+local function ClampOffsetX(value)
+    value = math.floor((tonumber(value) or 0) + 0.5)
+    if value < MIN_OFFSET_X then return MIN_OFFSET_X end
+    if value > MAX_OFFSET_X then return MAX_OFFSET_X end
+    return value
+end
+
+function EXT.GetLevelOffsetX()
+    local node = NameplateProfile()
+    return ClampOffsetX(node and node.extLevelOffsetX)
+end
+
+function EXT.SetLevelOffsetX(value)
+    local profile = DUI.db and DUI.db.profile
+    if not profile then return end
+    profile.modules = profile.modules or {}
+    profile.modules.nameplates = profile.modules.nameplates or {}
+    profile.modules.nameplates.extLevelOffsetX = ClampOffsetX(value)
+    if DUI.RefreshNameplates then
+        DUI:RefreshNameplates()
+    end
+end
+
+EXT.LEVEL_OFFSET_X_LIMITS = { min = MIN_OFFSET_X, max = MAX_OFFSET_X, step = 1 }
+
 -- Difficulty colour per kind of unit. On (default) keeps DragonUI's difficulty colour; off draws the
 -- level in WoW's normal text colour (gold) instead.
 local NORMAL_HEX = "ffd100"
@@ -334,7 +362,8 @@ local function UpdateLevelText(plateData)
     levelPlates[plateData] = true
 
     local framed = EXT.IsLevelFrameShown()
-    local placeKey = placement .. (framed and "F" or "")
+    local offsetX = EXT.GetLevelOffsetX()
+    local placeKey = placement .. (framed and "F" or "") .. offsetX
     if plateData._extLevelPlacement ~= placeKey then
         plateData._extLevelPlacement = placeKey
         box:ClearAllPoints()
@@ -342,20 +371,20 @@ local function UpdateLevelText(plateData)
         if framed then
             -- The level sits in the middle of the frame; the frame takes the spot the text had.
             if placement == "outsideLeft" then
-                box:SetPoint("RIGHT", hp, "LEFT", -GAP + FRAME_SHIFT, 0)
+                box:SetPoint("RIGHT", hp, "LEFT", -GAP + FRAME_SHIFT + offsetX, 0)
             else
-                box:SetPoint("LEFT", hp, "RIGHT", GAP - FRAME_SHIFT, 0)
+                box:SetPoint("LEFT", hp, "RIGHT", GAP - FRAME_SHIFT + offsetX, 0)
             end
             fs:SetJustifyH("CENTER")
             fs:SetPoint("CENTER", box, "CENTER", 0, 0)
         elseif placement == "outsideLeft" then
-            box:SetPoint("RIGHT", hp, "LEFT", -GAP, 0)
+            box:SetPoint("RIGHT", hp, "LEFT", -GAP + offsetX, 0)
             fs:SetJustifyH("RIGHT")
-            fs:SetPoint("RIGHT", hp, "LEFT", -GAP, 0)
+            fs:SetPoint("RIGHT", hp, "LEFT", -GAP + offsetX, 0)
         else
-            box:SetPoint("LEFT", hp, "RIGHT", GAP, 0)
+            box:SetPoint("LEFT", hp, "RIGHT", GAP + offsetX, 0)
             fs:SetJustifyH("LEFT")
-            fs:SetPoint("LEFT", hp, "RIGHT", GAP, 0)
+            fs:SetPoint("LEFT", hp, "RIGHT", GAP + offsetX, 0)
         end
     end
     local _, barH = NP.config.GetBarRefSize()

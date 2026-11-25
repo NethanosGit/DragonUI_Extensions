@@ -7,6 +7,7 @@
 TargetVisibility.lua
 NameplateName.lua
 NameplateHealthText.lua
+NameplateHealthBar.lua
 NameplateLevel.lua
 NameplateTarget.lua
 NameplateIcons.lua

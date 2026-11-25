@@ -10,20 +10,23 @@ Extra options for [DragonUI](../DragonUI), loaded as a separate addon.
   hidden otherwise. It is exclusive with DragonUI's *Show on Hover Only*, *Show in Combat Only*
   and *Hide in Combat* for that entry.
   - Open the settings window with `/duiext`.
-- **Frames > Nameplates > Style** (tab): *WoW Forever (Thin)* nameplates, ported from
-  [DragonUI pull request #586](https://github.com/NeticSoul/DragonUI/pull/586): 166x13 bars with the
-  original borders, focus ring, cast bar art and a level badge right of the bar. It runs on top of
-  DragonUI's Modern style; choosing Heritage in DragonUI_Options turns it off. Turning it on applies
-  the pull request's defaults (plus matching values for this addon's own settings, and the raid
-  marker on the left so it clears the badge); turning it off restores the previous values.
-  *Reset Forever Defaults* re-applies them. DragonUI_Options does not grey out *Level Format*,
-  *Show Threat Glow* or *Show Elite Icon*; the threat flare and elite icon stay hidden.
+- **Frames > Nameplates > Style** (tab): *WoW Forever (Thin)* nameplate art, ported from
+  [DragonUI pull request #586](https://github.com/NeticSoul/DragonUI/pull/586): the original
+  borders, focus ring, cast bar and level badge. Only the art changes; sizes, fonts, text placement
+  and icons follow your settings. With *Level > Position* outside the bar the level is drawn in the
+  badge, on that side, using the Level tab's font size, style, colours and *Show Frame Under*; with
+  *Before the Name* the level stays in the name. It runs on top of DragonUI's Modern style; choosing
+  Heritage in DragonUI_Options turns it off. The pull request's own look uses 166x13 bars with a
+  cast bar height of 6.
   The artwork in `Textures/Forever` is copyright Blizzard Entertainment (sources in
-  `Textures/Forever/provenance.json`). Stored as `modules.nameplates.extForeverStyle`,
-  `extForeverSaved` and `extForeverBackup`.
+  `Textures/Forever/provenance.json`). Stored as `modules.nameplates.extForeverStyle` and
+  `extForeverPrevStyle`.
 - **Frames > Nameplates > Health** (tab): the health text Font Size (-3 to 10), with no style restrictions. It works
   in the Modern style too, where DragonUI_Options locks the slider and sizes the text like the name.
   Stored as `modules.nameplates.healthNumberFontSize`, the same key DragonUI_Options uses.
+  The same tab has **Cut Texture on Health Loss** (off by default): in the Modern and WoW Forever styles the health
+  fill is cut at the health value instead of being squeezed into it. Stored as
+  `modules.nameplates.extHealthCutFill`.
 - **Frames > Nameplates > Name** (tab): Font Size of the name, from -3 to 10 in steps of 0.5. DragonUI_Options
   stops at 1. The name is drawn at 9 + the value; the power text uses 7 + the value.
   Stored as `modules.nameplates.fontSize`, the same key DragonUI_Options uses. If the value is below
@@ -36,6 +39,8 @@ Extra options for [DragonUI](../DragonUI), loaded as a separate addon.
   Stored as `modules.nameplates.levelPlacement`.
   *Style* picks Outline, Shadow or Outline & Shadow for the outside level text
   (`modules.nameplates.extLevelStyle`).
+  *Horizontal Offset* (-50 to 50) moves the outside level left or right, including its frame and the
+  Forever badge (`modules.nameplates.extLevelOffsetX`).
 
 ## Notes
 

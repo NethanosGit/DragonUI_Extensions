@@ -124,8 +124,18 @@ PAGES.health = {
     title = "Health",
     build = function(container)
         local C = DUI.PanelControls
-        C:AddDescription(container, "Health text font size for nameplates. It applies in every style, including Modern.")
+        C:AddDescription(container, "Health bar and health text of nameplates.")
         C:AddSpacer(container)
+
+        if EXT.SetHealthFillCut then
+            local barSection = C:AddSection(container, "Health Bar")
+            C:AddToggle(barSection, {
+                label = "Cut Texture on Health Loss",
+                desc = "Cuts the health bar texture as health drops instead of shrinking it. Affects the Modern and WoW Forever styles; Heritage already cuts it.",
+                getFunc = function() return EXT.IsHealthFillCut() end,
+                setFunc = function(value) EXT.SetHealthFillCut(value) end,
+            })
+        end
 
         local section = C:AddSection(container, "Health Text")
         C:AddSlider(section, {
@@ -172,6 +182,15 @@ PAGES.level = {
             width = 260,
             getFunc = function() return EXT.GetLevelPlacement() end,
             setFunc = function(value) EXT.SetLevelPlacement(value) end,
+        })
+        local offsetLimits = EXT.LEVEL_OFFSET_X_LIMITS
+        C:AddSlider(section, {
+            label = "Horizontal Offset",
+            desc = "Moves the level left (negative) or right (positive). Applies when the level is drawn outside the bar.",
+            min = offsetLimits.min, max = offsetLimits.max, step = offsetLimits.step,
+            width = 200,
+            getFunc = function() return EXT.GetLevelOffsetX() end,
+            setFunc = function(value) EXT.SetLevelOffsetX(value) end,
         })
         C:AddDropdown(section, {
             label = "Style",
@@ -227,7 +246,7 @@ PAGES.style = {
             C:AddDescription(container, "The WoW Forever style does not work with this version of DragonUI.")
             return
         end
-        C:AddDescription(container, "WoW Forever nameplates: thin bars with the original borders and cast bar, and a level badge right of the bar. Turning it on applies the style's sizes, fonts and text placement; turning it off restores what you had. Changes made while it is on are remembered for next time.")
+        C:AddDescription(container, "WoW Forever nameplate art: the original borders, cast bar and level badge. Sizes, fonts, text placement and icons stay as you have set them. The badge is used when Level > Position is outside the bar.")
         C:AddSpacer(container)
 
         local section = C:AddSection(container, "Nameplate Art")
@@ -236,12 +255,6 @@ PAGES.style = {
             desc = "Runs on top of DragonUI's Modern style. Picking Heritage in DragonUI Options turns it off.",
             getFunc = function() return EXT.IsForeverStyle() end,
             setFunc = function(value) EXT.SetForeverStyle(value) end,
-        })
-        C:AddButton(section, {
-            label = "Reset Forever Defaults",
-            desc = "Puts the Forever style back to its default sizes, fonts and text placement.",
-            width = 220,
-            callback = function() EXT.ResetForeverStyle() end,
         })
     end,
 }

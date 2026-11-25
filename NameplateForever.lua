@@ -6,11 +6,14 @@
 -- so with this addon disabled the plates are ordinary Modern plates. Picking Heritage in
 -- DragonUI_Options turns the Forever style off.
 --
+-- Only the art changes: sizes, fonts, text placement, icons and the level position are whatever the
+-- settings say.
+--
 -- Must load after NameplateName, NameplateLevel, NameplateTarget and NameplateIcons: these wrappers
 -- have the last word over theirs.
 --
--- Stored in DragonUI's profile: modules.nameplates.extForeverStyle, extForeverSaved (the Forever
--- layout) and extForeverBackup (the layout to return to).
+-- Stored in DragonUI's profile: modules.nameplates.extForeverStyle and extForeverPrevStyle (the
+-- plate style to return to).
 
 local DUI = _G.DragonUI
 local EXT = _G.DragonUIExtensions
@@ -30,7 +33,7 @@ local REQUIRED = {
     layout = { "LayoutMinaStack", "LayoutCastBarStack", "HideMinaStack", "AnchorPlateName", "SafeSetFont" },
     gather = { "SyncName", "SyncHealth", "SyncTargetHighlight", "RefreshPlateTargetState",
         "IsHeadlineActive", "IsTotemIconOnlyActive" },
-    widgets = { "Get", "SyncEliteIcon" },
+    widgets = { "Get" },
     discovery = { "FormatPlateName" },
     identity = { "ProcessContextTransitions", "IsTargetPlateVisual", "IsFocusPlate" },
     lifecycle = { "InvalidatePlateVisuals" },
@@ -47,12 +50,29 @@ if not (chrome and chrome.Layout and chrome.Sync and type(DUI.RefreshNameplates)
 end
 
 -- ============================================================================
--- SETTINGS: the pull request's preset, saved and restored around the style
+-- SETTINGS: one switch; every other setting stays as the user has it
 -- ============================================================================
 
-local PRESET = {
-    -- DragonUI fields the pull request seeds, with its values.
-    plateStyle = "modern",
+local function Profile()
+    return DUI.db and DUI.db.profile and DUI.db.profile.modules and DUI.db.profile.modules.nameplates
+end
+
+local function IsForever()
+    local cfg = NP.config.GetCfg()
+    return cfg.extForeverStyle == true and NP.config.IsRetailSkin()
+end
+
+-- DragonUI skips layout passes while its signatures are unchanged: force them on the plates in view.
+local function InvalidatePlates()
+    for _, pd in pairs(NP.module and NP.module.plates or {}) do
+        pd._layoutSig = nil
+        pd._retailChromeSig = nil
+    end
+end
+
+-- The first version of this style overwrote settings and kept the old ones in extForeverBackup.
+-- These are the values it forced: any still in place goes back to the old one.
+local OLD_FORCED = {
     barWidth = 166, barHeight = 13, castBarHeight = 6, castBarGap = 2,
     fontSize = 5, castBarSpellNameFontSize = 10, debuffCooldownFontSize = 10, nameFont = "primary",
     centerNameOnly = true, nameOverlayHealthBar = false, retailTextOutlineAbove = true,
@@ -64,62 +84,23 @@ local PRESET = {
     retailSelectionBorder = true, retailDeselectedOverlay = true,
     retailMouseoverHighlight = true, showTargetHighlight = true,
     showEliteIcon = false, threatGlow = false, showTargetArrows = false, showPowerBar = false,
-
-    -- This addon's own settings, set so they draw what the pull request draws.
     extNameStyle = "outline", extHealthStyle = "outline",
-    extNameNoCrop = false, extNameOffsetY = 0,
-    healthNumberFontSize = 7, -- drawn at 7 + 7 = 14, the name's size (9 + 5)
-    levelPlacement = "beforeName", -- the badge replaces the outside level text and its frame
-    extRaidMarkerSide = "left", extRaidMarkerOffsetX = 0, -- the badge sits right of the bar
+    extNameNoCrop = false, extNameOffsetY = 0, healthNumberFontSize = 7,
+    levelPlacement = "beforeName", extRaidMarkerSide = "left", extRaidMarkerOffsetX = 0,
 }
 
--- Preset fields that start unset, meaning the default (a white target border).
-local UNSET = { "extTargetHighlightColor" }
-
-local FIELDS = {}
-for key in pairs(PRESET) do FIELDS[#FIELDS + 1] = key end
-for _, key in ipairs(UNSET) do FIELDS[#FIELDS + 1] = key end
-
--- What DragonUI_Options itself rewrites when its style dropdown changes; those values must survive.
-local OPTIONS_OWNED = {
-    plateStyle = true, barWidth = true, barHeight = true, castBarHeight = true, fontSize = true,
-    castBarSpellNameFontSize = true, debuffCooldownFontSize = true, threatGlow = true,
-}
-
-local function Profile()
-    return DUI.db and DUI.db.profile and DUI.db.profile.modules and DUI.db.profile.modules.nameplates
-end
-
-local function IsForever()
-    local cfg = NP.config.GetCfg()
-    return cfg.extForeverStyle == true and NP.config.IsRetailSkin()
-end
-
-local function CopyValue(value)
-    if type(value) ~= "table" then return value end
-    local copy = {}
-    for k, v in pairs(value) do copy[k] = v end
-    return copy
-end
-
-local function Snapshot(node)
-    local copy = {}
-    for _, key in ipairs(FIELDS) do copy[key] = CopyValue(node[key]) end
-    return copy
-end
-
-local function Restore(node, values, keep)
-    for _, key in ipairs(FIELDS) do
-        if not (keep and keep[key]) then node[key] = CopyValue(values[key]) end
+local function RestoreOldSettings()
+    local node = Profile()
+    if not node then return false end
+    local backup = node.extForeverBackup
+    node.extForeverBackup, node.extForeverSaved = nil, nil
+    if not backup then return false end
+    for key, forced in pairs(OLD_FORCED) do
+        if node[key] == forced and backup[key] ~= nil then node[key] = backup[key] end
     end
-end
-
--- DragonUI skips layout passes while its signatures are unchanged: force them on the plates in view.
-local function InvalidatePlates()
-    for _, pd in pairs(NP.module and NP.module.plates or {}) do
-        pd._layoutSig = nil
-        pd._retailChromeSig = nil
-    end
+    -- The highlight colour was cleared rather than set.
+    if node.extTargetHighlightColor == nil then node.extTargetHighlightColor = backup.extTargetHighlightColor end
+    return true
 end
 
 function EXT.IsForeverStyle()
@@ -129,48 +110,47 @@ end
 
 function EXT.SetForeverStyle(value)
     local node = Profile()
-    if not node or (value and true or false) == EXT.IsForeverStyle() then return end
+    value = value and true or false
+    if not node or value == EXT.IsForeverStyle() then return end
+    RestoreOldSettings()
     if value then
-        node.extForeverBackup = Snapshot(node)
-        Restore(node, node.extForeverSaved or PRESET)
-        node.extForeverStyle = true
+        -- The art is drawn on top of DragonUI's Modern style.
+        node.extForeverPrevStyle = nil
+        if not NP.config.IsRetailSkin() then
+            node.extForeverPrevStyle = node.plateStyle
+            node.plateStyle = "modern"
+        end
     else
-        node.extForeverSaved = Snapshot(node)
-        node.extForeverStyle = false
-        if node.extForeverBackup then Restore(node, node.extForeverBackup) end
-        node.extForeverBackup = nil
+        node.plateStyle = node.extForeverPrevStyle or node.plateStyle
+        node.extForeverPrevStyle = nil
     end
+    node.extForeverStyle = value
     InvalidatePlates()
     DUI:RefreshNameplates()
 end
 
-function EXT.ResetForeverStyle()
-    local node = Profile()
-    if not node then return end
-    node.extForeverSaved = nil
-    if EXT.IsForeverStyle() then
-        Restore(node, PRESET)
-        InvalidatePlates()
-        DUI:RefreshNameplates()
-    end
-end
-
--- Heritage picked in DragonUI_Options ends the style; otherwise remember its latest layout.
+-- Heritage picked in DragonUI_Options ends the style.
 local origRefresh = DUI.RefreshNameplates
 function DUI.RefreshNameplates(...)
+    RestoreOldSettings()
     local node = Profile()
     if node and node.extForeverStyle == true then
-        if NP.config.IsRetailSkin() then
-            node.extForeverSaved = Snapshot(node)
-        else
-            node.extForeverStyle = false
-            if node.extForeverBackup then Restore(node, node.extForeverBackup, OPTIONS_OWNED) end
-            node.extForeverBackup = nil
+        if not NP.config.IsRetailSkin() then
+            node.extForeverStyle, node.extForeverPrevStyle = false, nil
         end
         InvalidatePlates()
     end
     return origRefresh(...)
 end
+
+local loader = CreateFrame("Frame")
+loader:RegisterEvent("PLAYER_LOGIN")
+loader:SetScript("OnEvent", function()
+    if RestoreOldSettings() then
+        InvalidatePlates()
+        DUI:RefreshNameplates()
+    end
+end)
 
 -- ============================================================================
 -- ART: atlas keys and cast fills
@@ -201,11 +181,18 @@ function NP.config.GetCastFillTexture(isChannel, notInterruptible, interrupted)
 end
 
 -- ============================================================================
--- LEVEL BADGE: right of the health bar
+-- LEVEL BADGE: the Level tab's outside positions, drawn with the original badge art
 -- ============================================================================
 
 local function HideBadge(plateData)
     if plateData and plateData._extFvBadge then plateData._extFvBadge:Hide() end
+end
+
+-- "Before the Name" keeps the level in the name; the outside positions use the badge.
+local function BadgeSide()
+    local placement = EXT.GetLevelPlacement and EXT.GetLevelPlacement()
+    if placement == "outsideLeft" then return "left" end
+    if placement == "outsideRight" then return "right" end
 end
 
 -- The Level tab's difficulty colour toggles apply to the badge too.
@@ -261,21 +248,38 @@ local function SyncBadge(plateData, unit, fallback, boss)
     local _, h = NP.config.GetBarRefSize()
     local scale = h / 13
     local w, fh = 28 * scale, h + 5 * scale
-    local signature = h .. ":" .. tostring(NP.module._cfgRev)
+    local side = BadgeSide()
+    local framed = EXT.IsLevelFrameShown()
+    local size = 4 + EXT.GetLevelFontSize()
+    local style = EXT.GetLevelStyle()
+    local offsetX = EXT.GetLevelOffsetX()
+    local signature = table.concat({ h, tostring(side), tostring(framed), size, style, offsetX,
+        tostring(NP.module._cfgRev) }, ":")
     if frame.signature ~= signature then
         frame.signature = signature
         frame:SetSize(w, fh)
         frame:ClearAllPoints()
-        frame:SetPoint("LEFT", hp, "RIGHT", 5 * scale, 0.5 * scale)
+        if side == "left" then
+            frame:SetPoint("RIGHT", hp, "LEFT", -5 * scale + offsetX, 0.5 * scale)
+        else
+            frame:SetPoint("LEFT", hp, "RIGHT", 5 * scale + offsetX, 0.5 * scale)
+        end
         A.LayoutSlice(frame.bg, "levelBg", frame, w, fh, 0, 0, 0, 0)
-        A.ShowSlice(frame.bg)
         A.LayoutSlice(frame.selected, "levelSelected", frame, w, fh, 3 * scale, 3 * scale, 3 * scale, 4 * scale)
+        if framed then A.ShowSlice(frame.bg) else A.HideSlice(frame.bg) end
         A.Apply(frame.skull, "levelSkull")
         -- The cell is 26 logical pixels with the glyph inset; 21 matches the original badge.
         frame.skull:SetSize(21 * scale, 21 * scale)
-        NP.layout.SafeSetFont(frame.text, NP.config.GetNameplateFont(), max(8, 10 * scale), "OUTLINE")
+        local outline = (style == "outline" or style == "both")
+        NP.layout.SafeSetFont(frame.text, NP.config.GetNameplateFont(), size, outline and "OUTLINE" or "")
+        frame.text:SetShadowOffset(1, -1)
+        frame.text:SetShadowColor(0, 0, 0, (style == "shadow" or style == "both") and 1 or 0)
     end
-    PaintSelection(frame.selected, NP.identity.IsTargetPlateVisual(plateData), NP.identity.IsFocusPlate(plateData))
+    if framed then
+        PaintSelection(frame.selected, NP.identity.IsTargetPlateVisual(plateData), NP.identity.IsFocusPlate(plateData))
+    else
+        A.HideSlice(frame.selected)
+    end
     if boss or level <= 0 then
         frame.text:Hide()
         frame.skull:Show()
@@ -297,7 +301,7 @@ end
 -- DragonUI calls this exactly when a plate should show a level, so it feeds the badge.
 local origFormat = NP.discovery.FormatPlateName
 function NP.discovery.FormatPlateName(plateData, unit, levelOverride)
-    if not (plateData and IsForever()) then
+    if not (plateData and IsForever() and BadgeSide()) then
         return origFormat(plateData, unit, levelOverride)
     end
     plateData._extFvWanted, plateData._extFvUnit, plateData._extFvLevel = true, unit, levelOverride
@@ -347,7 +351,7 @@ function NP.lifecycle.InvalidatePlateVisuals(plateData, ...)
 end
 
 -- ============================================================================
--- HEALTH BAR CHROME: selection border (target and focus), dim overlay, no aggro flare
+-- HEALTH BAR CHROME: selection border (target and focus) and dim overlay
 -- ============================================================================
 
 -- Colours the selection border for target or focus and keeps the dim overlay off both.
@@ -364,19 +368,6 @@ local function SyncSelection(plateData, isTarget)
     end
 end
 
-local function SetFlareArt(plateData, forever)
-    local flare = plateData._retailFlare
-    if not flare or (plateData._extFvNoFlare or false) == forever then return end
-    plateData._extFvNoFlare = forever
-    for i = 1, 4 do
-        if forever then
-            flare[i]:SetTexture(nil)
-        else
-            flare[i]:SetTexture(A.AGGRO_FLARE)
-        end
-    end
-end
-
 local origChromeLayout = chrome.Layout
 function chrome.Layout(plateData, ...)
     local forever = IsForever()
@@ -387,7 +378,6 @@ function chrome.Layout(plateData, ...)
     end
     local before = plateData._retailChromeSig
     local ok = origChromeLayout(plateData, ...)
-    SetFlareArt(plateData, forever)
     local hp = plateData.minaHp
     if forever and hp and (before == nil or before ~= plateData._retailChromeSig) then
         local w, h = NP.config.GetBarRefSize()
@@ -427,15 +417,6 @@ function NP.identity.ProcessContextTransitions(...)
         if oldFocus then NP.gather.RefreshPlateTargetState(oldFocus, "forever_focus_changed") end
         if newFocus then NP.gather.RefreshPlateTargetState(newFocus, "forever_focus_changed") end
     end
-end
-
-local origElite = NP.widgets.SyncEliteIcon
-function NP.widgets.SyncEliteIcon(plateData, ...)
-    if IsForever() then
-        if plateData._eliteIcon then plateData._eliteIcon:Hide() end
-        return
-    end
-    return origElite(plateData, ...)
 end
 
 -- DragonUI centres the health text on the bar, which looks low on the thin art: raise it.
