@@ -218,16 +218,45 @@ PAGES.level = {
 local window, scroll, currentPage
 local RenderPage
 
--- Nameplates: one sidebar entry under Frames, with Name / Health / Level as sub-tabs, like
+-- Style: the WoW Forever nameplate skin (NameplateForever.lua).
+PAGES.style = {
+    title = "Style",
+    build = function(container)
+        local C = DUI.PanelControls
+        if not EXT.SetForeverStyle then
+            C:AddDescription(container, "The WoW Forever style does not work with this version of DragonUI.")
+            return
+        end
+        C:AddDescription(container, "WoW Forever nameplates: thin bars with the original borders and cast bar, and a level badge right of the bar. Turning it on applies the style's sizes, fonts and text placement; turning it off restores what you had. Changes made while it is on are remembered for next time.")
+        C:AddSpacer(container)
+
+        local section = C:AddSection(container, "Nameplate Art")
+        C:AddToggle(section, {
+            label = "WoW Forever (Thin)",
+            desc = "Runs on top of DragonUI's Modern style. Picking Heritage in DragonUI Options turns it off.",
+            getFunc = function() return EXT.IsForeverStyle() end,
+            setFunc = function(value) EXT.SetForeverStyle(value) end,
+        })
+        C:AddButton(section, {
+            label = "Reset Forever Defaults",
+            desc = "Puts the Forever style back to its default sizes, fonts and text placement.",
+            width = 220,
+            callback = function() EXT.ResetForeverStyle() end,
+        })
+    end,
+}
+
+-- Nameplates: one sidebar entry under Frames, with Style / Name / Health / Level as sub-tabs, like
 -- DragonUI_Options. Each sub-tab is built by the matching PAGES entry above.
 local NAMEPLATE_SUBTABS = {
+    { key = "style",  label = "Style" },
     { key = "name",   label = "Name" },
     { key = "health", label = "Health" },
     { key = "level",  label = "Level" },
     { key = "target", label = "Target" },
     { key = "icons",  label = "Icons" },
 }
-local activeNameplateSubTab = "name"
+local activeNameplateSubTab = "style"
 
 PAGES.nameplates = {
     title = "Nameplates",

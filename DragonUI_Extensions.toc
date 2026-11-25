@@ -10,5 +10,7 @@ NameplateHealthText.lua
 NameplateLevel.lua
 NameplateTarget.lua
 NameplateIcons.lua
+ForeverAtlas.lua
+NameplateForever.lua
 BagsterSections.lua
 ExtensionsWindow.lua

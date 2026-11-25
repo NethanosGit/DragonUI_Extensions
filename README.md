@@ -10,6 +10,17 @@ Extra options for [DragonUI](../DragonUI), loaded as a separate addon.
   hidden otherwise. It is exclusive with DragonUI's *Show on Hover Only*, *Show in Combat Only*
   and *Hide in Combat* for that entry.
   - Open the settings window with `/duiext`.
+- **Frames > Nameplates > Style** (tab): *WoW Forever (Thin)* nameplates, ported from
+  [DragonUI pull request #586](https://github.com/NeticSoul/DragonUI/pull/586): 166x13 bars with the
+  original borders, focus ring, cast bar art and a level badge right of the bar. It runs on top of
+  DragonUI's Modern style; choosing Heritage in DragonUI_Options turns it off. Turning it on applies
+  the pull request's defaults (plus matching values for this addon's own settings, and the raid
+  marker on the left so it clears the badge); turning it off restores the previous values.
+  *Reset Forever Defaults* re-applies them. DragonUI_Options does not grey out *Level Format*,
+  *Show Threat Glow* or *Show Elite Icon*; the threat flare and elite icon stay hidden.
+  The artwork in `Textures/Forever` is copyright Blizzard Entertainment (sources in
+  `Textures/Forever/provenance.json`). Stored as `modules.nameplates.extForeverStyle`,
+  `extForeverSaved` and `extForeverBackup`.
 - **Frames > Nameplates > Health** (tab): the health text Font Size (-3 to 10), with no style restrictions. It works
   in the Modern style too, where DragonUI_Options locks the slider and sizes the text like the name.
   Stored as `modules.nameplates.healthNumberFontSize`, the same key DragonUI_Options uses.
