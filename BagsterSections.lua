@@ -5,8 +5,8 @@
 -- Trinket), Crafting, Miscellaneous, and Empty (one slot showing how many are free).
 -- The rarity filter, search and bag column stay as they are. Applies to the inventory only, not the bank.
 --
--- Nothing in DragonUI is edited. Relies on DragonUI.BagsterModule internals: the ItemFrame.Layout,
--- SideFilter/BottomFilter.UpdateFilters, Frame.SetCategory/SetSubCategory and ItemSlot.Update methods.
+-- Nothing in DragonUI is edited. Relies on DragonUI.BagsterModule internals: the ItemFrame.Layout/UpdateSlot,
+-- SideFilter/BottomFilter.UpdateFilters, Frame.SetCategory/SetSubCategory and ItemSlot.Update/Set/Free methods.
 -- The setting is stored as modules.bagster.extSections in DragonUI's profile.
 
 local DUI = _G.DragonUI
@@ -105,31 +105,74 @@ function Frame:SetSubCategory(name)
     return origSetSubCategory(self, name)
 end
 
--- The Empty section shows one slot carrying the free-slot total; keep the count when the slot refreshes.
-local origItemUpdate = ItemSlot.Update
-function ItemSlot:Update()
-    origItemUpdate(self)
-    -- The ring, icon and count share the BORDER layer; pin their order so the ring never ends up above the icon.
+-- Smaller icon and pinned draw order, on sectioned inventory slots only. Slots are pooled and shared
+-- with the bank, so a slot that stops qualifying is put back the way Bagster skins it.
+local function SetSectionChrome(self, enable)
+    if not enable and not self._extChrome then return end
+    self._extChrome = enable or nil
+
     local ring = self._dragonuiSlotBorder
     local name = self:GetName()
     local icon = name and _G[name .. "IconTexture"]
     local count = name and _G[name .. "Count"]
+    -- The ring, icon and count share the BORDER layer; pin their order so the ring never ends up above the icon.
     if ring then ring:SetDrawLayer("BORDER", 0) end
     if icon then
-        icon:SetDrawLayer("BORDER", 1)
+        icon:SetDrawLayer("BORDER", enable and 1 or 0)
         -- Sectioned inventory: icon 2px smaller on every side.
-        local inset = (not self:IsBank() and EXT.IsBagsterSections()) and 2 or 0
-        if self._extIconInset ~= inset then
-            self._extIconInset = inset
-            icon:ClearAllPoints()
-            icon:SetPoint("TOPLEFT", self, "TOPLEFT", inset, -inset)
-            icon:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -inset, inset)
+        local inset = enable and 2 or 0
+        icon:ClearAllPoints()
+        icon:SetPoint("TOPLEFT", self, "TOPLEFT", inset, -inset)
+        icon:SetPoint("BOTTOMRIGHT", self, "BOTTOMRIGHT", -inset, inset)
+    end
+    if count then count:SetDrawLayer("BORDER", enable and 2 or 0) end
+end
+
+local function UpdateSectionChrome(self)
+    SetSectionChrome(self, not self:IsBank() and EXT.IsBagsterSections())
+end
+
+-- Drops the free-slot total from a slot and shows its real stack count again.
+local function ClearEmptyCount(self)
+    if not self._extEmptyCount then return end
+    self._extEmptyCount = nil
+    local _, count = self:GetItemSlotInfo()
+    SetItemButtonCount(self, count)
+end
+
+-- The Empty section shows one slot carrying the free-slot total; keep the count when the slot refreshes.
+local origItemUpdate = ItemSlot.Update
+function ItemSlot:Update()
+    origItemUpdate(self)
+    UpdateSectionChrome(self)
+    if self._extEmptyCount then
+        if self:GetItemSlotInfo() then
+            -- An item went into the slot: its own stack count applies.
+            ClearEmptyCount(self)
+        else
+            SetItemButtonCount(self, self._extEmptyCount)
         end
     end
-    if count then count:SetDrawLayer("BORDER", 2) end
+end
+
+-- A new slot is skinned after its first Update, which resets the icon, so apply ours again.
+local origItemSet = ItemSlot.Set
+function ItemSlot:Set(parent, bag, slot)
+    origItemSet(self, parent, bag, slot)
+    self._extChrome = nil
+    UpdateSectionChrome(self)
+end
+
+-- Released slots go back to the pool clean.
+local origItemFree = ItemSlot.Free
+function ItemSlot:Free()
+    self._extKind = nil
     if self._extEmptyCount then
-        SetItemButtonCount(self, self._extEmptyCount)
+        self._extEmptyCount = nil
+        SetItemButtonCount(self, 0)
     end
+    SetSectionChrome(self, false)
+    return origItemFree(self)
 end
 
 -- ============================================================================
@@ -370,8 +413,12 @@ local function SectionLayout(self, parent)
                 local item = items[ToIndex(bag, slot)]
                 if item then
                     local key = Classify(self:GetItemLink(bag, slot))
+                    item._extKind = key
                     if key == "empty" then
-                        emptyItems[#emptyItems + 1] = item
+                        -- Empty keyring slots are not bag space; they stay hidden.
+                        if bag ~= KEYRING_CONTAINER then
+                            emptyItems[#emptyItems + 1] = item
+                        end
                     else
                         local list = buckets[key]
                         list[#list + 1] = item
@@ -430,10 +477,7 @@ local function SectionLayout(self, parent)
 
     for _, item in pairs(items) do
         if not placed[item] then item:Hide() end
-        if item ~= emptyRep and item._extEmptyCount then
-            item._extEmptyCount = nil
-            SetItemButtonCount(item, 0)
-        end
+        if item ~= emptyRep then ClearEmptyCount(item) end
     end
     if emptyRep then
         emptyRep._extEmptyCount = emptyCount
@@ -458,10 +502,22 @@ function ItemFrame:Layout()
     -- Classic grid: drop the section extras before it takes over.
     HideHeaders(self)
     for _, item in pairs(self.items) do
-        if item._extEmptyCount then
-            item._extEmptyCount = nil
-            SetItemButtonCount(item, 0)
-        end
+        ClearEmptyCount(item)
     end
     return origLayout(self)
+end
+
+-- Bagster only re-arranges when slots appear or disappear. Sections also depend on what a slot holds,
+-- so re-arrange when that changes.
+local origUpdateSlot = ItemFrame.UpdateSlot
+function ItemFrame:UpdateSlot(bag, slot, link)
+    local changed = origUpdateSlot(self, bag, slot, link)
+    local parent = self:GetParent()
+    if parent and Active(parent) then
+        local item = self.items[ToIndex(bag, slot)]
+        if item and item._extKind and item._extKind ~= Classify(self:GetItemLink(bag, slot)) then
+            self:RequestLayout()
+        end
+    end
+    return changed
 end
