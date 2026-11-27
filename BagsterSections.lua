@@ -2,7 +2,7 @@
 --
 -- Replaces Bagster's category tabs with one view where the items are split into labelled sections:
 -- a top row (Hearthstone, Potion, Food, Consumable, Devices, Quest), then Equipment (Armor, Weapon,
--- Trinket), Crafting, Miscellaneous, and Empty (one slot showing how many are free).
+-- Trinket), Crafting, Miscellaneous, Keys, and Empty (one slot showing how many are free).
 -- The rarity filter, search and bag column stay as they are. Applies to the inventory only, not the bank.
 --
 -- Nothing in DragonUI is edited. Relies on DragonUI.BagsterModule internals: the ItemFrame.Layout/UpdateSlot,
@@ -202,6 +202,7 @@ local function Labels()
         gem        = mod.L.Gem or "Gem",
         recipe     = mod.L.Recipe or "Recipe",
         misc      = mod.L.Misc or "Miscellaneous",
+        keys      = "Keys",
         empty      = EMPTY or "Empty",
     }
     -- Names GetItemInfo reports for the consumable subtypes that get their own column.
@@ -210,9 +211,11 @@ local function Labels()
     return labels
 end
 
--- Returns the bucket key for an item link; nil link means an empty slot.
-local function Classify(link)
+-- Returns the bucket key for an item link in the given bag; nil link means an empty slot.
+local function Classify(link, bag)
     if not link then return "empty" end
+    -- Anything in the keyring is a key, whatever item type the game reports for it.
+    if bag == KEYRING_CONTAINER then return "keys" end
     local id = tonumber(link:match("item:(%d+)"))
     if id == HEARTHSTONE_ID then return "hearth" end
 
@@ -412,7 +415,7 @@ local function SectionLayout(self, parent)
             for slot = 1, numSlots do
                 local item = items[ToIndex(bag, slot)]
                 if item then
-                    local key = Classify(self:GetItemLink(bag, slot))
+                    local key = Classify(self:GetItemLink(bag, slot), bag)
                     item._extKind = key
                     if key == "empty" then
                         -- Empty keyring slots are not bag space; they stay hidden.
@@ -453,6 +456,7 @@ local function SectionLayout(self, parent)
         { "tradegood", L.tradegood }, { "gem", L.gem }, { "recipe", L.recipe },
     })
     Add("misc", L.misc, true, { { "misc" } })
+    Add("keys", L.keys, true, { { "keys" } })
 
     -- Empty: one slot standing for all of them, labelled with the total.
     local emptyCount = #emptyItems
@@ -515,7 +519,7 @@ function ItemFrame:UpdateSlot(bag, slot, link)
     local parent = self:GetParent()
     if parent and Active(parent) then
         local item = self.items[ToIndex(bag, slot)]
-        if item and item._extKind and item._extKind ~= Classify(self:GetItemLink(bag, slot)) then
+        if item and item._extKind and item._extKind ~= Classify(self:GetItemLink(bag, slot), bag) then
             self:RequestLayout()
         end
     end
