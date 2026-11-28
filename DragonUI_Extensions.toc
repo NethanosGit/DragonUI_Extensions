@@ -6,6 +6,7 @@
 
 TargetVisibility.lua
 AuraVisibility.lua
+PersonalResourceVisibility.lua
 NameplateName.lua
 NameplateHealthText.lua
 NameplateHealthBar.lua

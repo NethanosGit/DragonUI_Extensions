@@ -404,9 +404,60 @@ PAGES.auras = {
     end,
 }
 
+local function AddFadeSlider(container)
+    local C = DUI.PanelControls
+    local fade = C:AddSection(container, "Fade")
+    local limits = EXT.TARGET_FADE_LIMITS
+    C:AddSlider(fade, {
+        label = "Fade Duration",
+        desc = "Seconds the fade in and fade out take (0 to 2 in steps of 0.05, default 0.35, 0 = instant). Shared by every Show on Target frame and bar and by Personal Resources.",
+        min = limits.min, max = limits.max, step = limits.step,
+        width = 200,
+        getFunc = function() return EXT.GetTargetFadeDuration() end,
+        setFunc = function(value) EXT.SetTargetFadeDuration(value) end,
+    })
+end
+
+-- Personal Resources: when DragonUI's Personal Resource Display is shown
+-- (PersonalResourceVisibility.lua).
+PAGES.personalresource = {
+    title = "Personal Resources",
+    build = function(container)
+        local C = DUI.PanelControls
+        if not EXT.SetPersonalResourceMode then
+            C:AddDescription(container, "Personal Resources visibility does not work with this version of DragonUI.")
+            return
+        end
+        C:AddDescription(container, "When your Personal Resource Display is shown. Any checked condition shows it. With nothing checked it is always shown. Changing these sets DragonUI's own Visibility to Always; picking In Combat or Hidden there overrides them.")
+        C:AddSpacer(container)
+
+        local section = C:AddSection(container, "Visibility")
+        for _, entry in ipairs({
+            { "show_on_hover",  "Show on Hover",  "Show it while the mouse is over it." },
+            { "show_in_combat", "Show in Combat", "Show it while you are in combat." },
+            { "show_on_target", "Show on Target", "Show it while your target is an enemy (anything you can attack, including neutral units)." },
+            { "show_while_eating",  "Show while Eating or Drinking", "Show it while you are eating or drinking." },
+            { "show_while_casting", "Show while Casting", "Show it while you are casting or channeling." },
+            { "show_with_hot",      "Show with Heal over Time", "Show it while a heal over time is on you, from you or anyone else. Bandaging counts." },
+            { "show_with_debuff",   "Show with Debuff", "Show it while any debuff is on you, long ones such as Resurrection Sickness included." },
+            { "show_when_injured",  "Show when not at Full Health", "Show it while your health is below maximum." },
+        }) do
+            local mode = entry[1]
+            C:AddToggle(section, {
+                label = entry[2],
+                desc = entry[3],
+                getFunc = function() return EXT.GetPersonalResourceMode(mode) end,
+                setFunc = function(value) EXT.SetPersonalResourceMode(mode, value) end,
+            })
+        end
+
+        AddFadeSlider(container)
+    end,
+}
+
 -- Sidebar categories, in order. Each tab key is a PAGES key.
 local CATEGORIES = {
-    { label = "Frames", tabs = { "units", "auras", "nameplates" } },
+    { label = "Frames", tabs = { "units", "auras", "personalresource", "nameplates" } },
     { label = "Bars",   tabs = { "bars", "additional", "xprep" } },
     { label = "Bags",   tabs = { "bagster" } },
 }
@@ -436,16 +487,7 @@ local function BuildPage(container, page)
         })
     end
 
-    local fade = C:AddSection(container, "Fade")
-    local limits = EXT.TARGET_FADE_LIMITS
-    C:AddSlider(fade, {
-        label = "Fade Duration",
-        desc = "Seconds the fade in and fade out take when you gain or lose a target (0 to 2 in steps of 0.05, default 0.35, 0 = instant). Shared by every Show on Target frame and bar.",
-        min = limits.min, max = limits.max, step = limits.step,
-        width = 200,
-        getFunc = function() return EXT.GetTargetFadeDuration() end,
-        setFunc = function(value) EXT.SetTargetFadeDuration(value) end,
-    })
+    AddFadeSlider(container)
 end
 
 local function ReleaseScroll()

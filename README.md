@@ -15,6 +15,14 @@ Extra options for [DragonUI](../DragonUI), loaded as a separate addon.
   debuffs and weapon enchants, as one group. Any checked condition shows them; with none checked
   they are always shown. Hidden auras ignore the mouse. Stored in DragonUI's profile under
   `extensions.auras`.
+- **Frames > Personal Resources**: *Show on Hover*, *Show in Combat*, *Show on Target*, *Show while
+  Eating or Drinking*, *Show while Casting*, *Show with Heal over Time*, *Show with Debuff* and
+  *Show when not at Full Health* for DragonUI's Personal Resource Display. Heals over time are
+  matched against a fixed list of spells in `PersonalResourceVisibility.lua`. Here *Show on Target*
+  means an enemy target (anything you can attack). Any checked condition shows it; with none
+  checked it is always shown. Changing them sets DragonUI's own *Visibility* to *Always*; picking
+  *In Combat* or *Hidden* there overrides them. It uses the same *Fade Duration* as Show on Target.
+  Stored in DragonUI's profile under `extensions.personalresource`.
 - **Frames > Nameplates > Style** (tab): *WoW Forever (Thin)* nameplate art, ported from
   [DragonUI pull request #586](https://github.com/NeticSoul/DragonUI/pull/586): the original
   borders, focus ring, cast bar and level badge. Only the art changes; sizes, fonts, text placement
