@@ -455,9 +455,37 @@ PAGES.personalresource = {
     end,
 }
 
+-- Quest Tracker: level and difficulty colour on quest titles (QuestTrackerTitles.lua).
+PAGES.questtracker = {
+    title = "Quest Tracker",
+    build = function(container)
+        local C = DUI.PanelControls
+        if not EXT.SetQuestTrackerLevel then
+            C:AddDescription(container, "Quest title options do not work with this version of DragonUI.")
+            return
+        end
+        C:AddDescription(container, "Quest titles on DragonUI's quest tracker. Needs the Quest Tracker module on in DragonUI.")
+        C:AddSpacer(container)
+
+        local section = C:AddSection(container, "Quest Titles")
+        C:AddToggle(section, {
+            label = "Show Quest Level",
+            desc = "Shows the quest's level in front of its title, as in [80] Title.",
+            getFunc = function() return EXT.GetQuestTrackerLevel() end,
+            setFunc = function(value) EXT.SetQuestTrackerLevel(value) end,
+        })
+        C:AddToggle(section, {
+            label = "Use Difficulty Color",
+            desc = "Colors the quest title by how hard the quest is for your level (red, orange, yellow, green, gray).",
+            getFunc = function() return EXT.GetQuestTrackerDifficultyColor() end,
+            setFunc = function(value) EXT.SetQuestTrackerDifficultyColor(value) end,
+        })
+    end,
+}
+
 -- Sidebar categories, in order. Each tab key is a PAGES key.
 local CATEGORIES = {
-    { label = "Frames", tabs = { "units", "auras", "personalresource", "nameplates" } },
+    { label = "Frames", tabs = { "units", "auras", "personalresource", "nameplates", "questtracker" } },
     { label = "Bars",   tabs = { "bars", "additional", "xprep" } },
     { label = "Bags",   tabs = { "bagster" } },
 }

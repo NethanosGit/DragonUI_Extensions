@@ -16,4 +16,5 @@ NameplateIcons.lua
 ForeverAtlas.lua
 NameplateForever.lua
 BagsterSections.lua
+QuestTrackerTitles.lua
 ExtensionsWindow.lua
