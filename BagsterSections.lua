@@ -1,8 +1,8 @@
 -- DragonUI_Extensions: sectioned inventory for Bagster.
 --
 -- Replaces Bagster's category tabs with one view where the items are split into labelled sections:
--- a top row (Hearthstone, Potion, Food, Consumable, Devices, Quest), then Equipment (Armor, Weapon,
--- Trinket), Crafting, Miscellaneous, Keys, and Empty (one slot showing how many are free).
+-- a top row (Hearthstone, Potion, Food, Consumable, Ammo, Devices, Quest), then Equipment (Armor,
+-- Weapon, Trinket, BOE), Crafting, Miscellaneous, Keys, and Empty (one slot showing how many are free).
 -- The rarity filter, search and bag column stay as they are. Applies to the inventory only, not the bank.
 --
 -- Nothing in DragonUI is edited. Relies on DragonUI.BagsterModule internals: the ItemFrame.Layout/UpdateSlot,
@@ -191,12 +191,14 @@ local function Labels()
         potion     = enUS and "Potion" or consumables[2] or "Potion",
         food       = enUS and "Food" or consumables[1] or "Food",
         consumable = mod.L.Consumable or "Consumable",
+        ammo       = AMMOSLOT or "Ammo",
         devices    = mod.L.Devices or "Devices",
         quest      = mod.L.Quest or "Quest",
         equipment  = mod.GetSetDisplayName("Equipment"),
         armor      = mod.L.Armor or "Armor",
         weapon     = mod.L.Weapon or "Weapon",
         trinket    = INVTYPE_TRINKET or "Trinket",
+        boe        = "BOE",
         crafting   = "Crafting",
         tradegood  = mod.L.TradeGood or "Trade Goods",
         gem        = mod.L.Gem or "Gem",
@@ -208,11 +210,33 @@ local function Labels()
     -- Names GetItemInfo reports for the consumable subtypes that get their own column.
     labels.potionSub = { Potion = true, [consumables[2] or "Potion"] = true }
     labels.foodSub = { ["Food & Drink"] = true, [consumables[1] or "Food & Drink"] = true }
+    -- Arrows and bullets (item class "Projectile").
+    labels.projectileType = select(7, GetAuctionItemClasses()) or "Projectile"
     return labels
 end
 
--- Returns the bucket key for an item link in the given bag; nil link means an empty slot.
-local function Classify(link, bag)
+local scanner
+
+-- True when the item in this slot is still unbound and binds when equipped. Only the slot tooltip tells:
+-- a soulbound copy shows "Soulbound" on that line instead.
+local function IsBindOnEquip(bag, slot)
+    if not scanner then
+        scanner = CreateFrame("GameTooltip", "DragonUIExtensionsScanTooltip", nil, "GameTooltipTemplate")
+    end
+    scanner:SetOwner(WorldFrame, "ANCHOR_NONE")
+    scanner:ClearLines()
+    scanner:SetBagItem(bag, slot)
+    -- The binding line sits right under the name, after any extra lines such as "Heroic".
+    for i = 2, min(scanner:NumLines(), 5) do
+        local line = _G["DragonUIExtensionsScanTooltipTextLeft" .. i]
+        if line and line:GetText() == ITEM_BIND_ON_EQUIP then return true end
+    end
+    return false
+end
+
+-- Returns the bucket key for an item link in the given bag slot; nil link means an empty slot.
+-- cached: the slot is saved data (another character), so there is no live item to scan.
+local function Classify(link, bag, slot, cached)
     if not link then return "empty" end
     -- Anything in the keyring is a key, whatever item type the game reports for it.
     if bag == KEYRING_CONTAINER then return "keys" end
@@ -232,12 +256,14 @@ local function Classify(link, bag)
     elseif itype == mod.L.TradeGood then
         if subType == mod.L.Devices or subType == mod.L.Explosives then return "devices" end
         return "tradegood"
-    elseif itype == mod.L.Armor then
+    elseif itype == mod.L.Armor or itype == mod.L.Weapon then
+        if not cached and IsBindOnEquip(bag, slot) then return "boe" end
+        if itype == mod.L.Weapon then return "weapon" end
         return (equipLoc == "INVTYPE_TRINKET") and "trinket" or "armor"
-    elseif itype == mod.L.Weapon then
-        return "weapon"
     elseif itype == mod.L.Gem then
         return "gem"
+    elseif itype == L.projectileType then
+        return "ammo"
     elseif itype == mod.L.Recipe then
         return "recipe"
     end
@@ -250,7 +276,7 @@ end
 
 local HEAD_H, LABEL_H = 22, 14
 local LINE_GAP, SECTION_GAP, BLOCK_GAP = 4, 8, 0.4
-local MIN_SCALE, SCALE_STEP = 0.7, 0.05
+local MIN_SCALE = 0.7
 
 local function SetArrow(tex, collapsed)
     local name = collapsed and "common-button-dropdown-closed" or "common-button-dropdown-open"
@@ -361,6 +387,8 @@ local function Flow(self, sections, s, size, width, apply, placed)
             local used, lineH = 0, 0
             for _, block in ipairs(sec.blocks) do
                 local n = #block.items
+                -- Items wrap only at the bag's width. A block that does not fit beside the previous
+                -- ones starts a new line instead of being squeezed into the space left.
                 local w = min(n, cols)
                 if used > 0 and used + w > cols then
                     y = y + lineH + LINE_GAP
@@ -415,7 +443,7 @@ local function SectionLayout(self, parent)
             for slot = 1, numSlots do
                 local item = items[ToIndex(bag, slot)]
                 if item then
-                    local key = Classify(self:GetItemLink(bag, slot), bag)
+                    local key = Classify(self:GetItemLink(bag, slot), bag, slot, self:IsBagCached(bag))
                     item._extKind = key
                     if key == "empty" then
                         -- Empty keyring slots are not bag space; they stay hidden.
@@ -447,10 +475,11 @@ local function SectionLayout(self, parent)
 
     Add("top", nil, false, {
         { "hearth", L.hearth }, { "potion", L.potion }, { "food", L.food },
-        { "consumable", L.consumable }, { "devices", L.devices }, { "quest", L.quest },
+        { "consumable", L.consumable }, { "ammo", L.ammo }, { "devices", L.devices },
+        { "quest", L.quest },
     })
     Add("equipment", L.equipment, true, {
-        { "armor", L.armor }, { "weapon", L.weapon }, { "trinket", L.trinket },
+        { "armor", L.armor }, { "weapon", L.weapon }, { "trinket", L.trinket }, { "boe", L.boe },
     })
     Add("crafting", L.crafting, true, {
         { "tradegood", L.tradegood }, { "gem", L.gem }, { "recipe", L.recipe },
@@ -466,14 +495,9 @@ local function SectionLayout(self, parent)
         Add("empty", nil, false, { { "emptyRep", L.empty } })
     end
 
-    -- Largest scale that fits; below the floor the frame grows instead.
+    -- Icons always keep the configured size; when the rows do not fit, the frame grows instead.
     local s = max(cap, MIN_SCALE)
-    local total
-    while true do
-        total = Flow(self, sections, s, size, width, false)
-        if total <= height or s <= MIN_SCALE then break end
-        s = max(MIN_SCALE, s - SCALE_STEP)
-    end
+    local total = Flow(self, sections, s, size, width, false)
 
     local placed = {}
     for _, h in ipairs(self._extHeaders or {}) do h:Hide() end
@@ -519,7 +543,8 @@ function ItemFrame:UpdateSlot(bag, slot, link)
     local parent = self:GetParent()
     if parent and Active(parent) then
         local item = self.items[ToIndex(bag, slot)]
-        if item and item._extKind and item._extKind ~= Classify(self:GetItemLink(bag, slot), bag) then
+        if item and item._extKind
+            and item._extKind ~= Classify(self:GetItemLink(bag, slot), bag, slot, self:IsBagCached(bag)) then
             self:RequestLayout()
         end
     end

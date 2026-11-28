@@ -357,7 +357,7 @@ PAGES.bagster = {
     title = "Bagster",
     build = function(container)
         local C = DUI.PanelControls
-        C:AddDescription(container, "Replaces the category tabs on the Bagster inventory with sections: Hearthstone, Potion, Food, Consumable, Devices and Quest on top, then Equipment (Armor, Weapon, Trinket), Crafting, Miscellaneous, Keys and Empty. The rarity filter stays. Needs the Bagster module on in DragonUI. The bank is not changed.")
+        C:AddDescription(container, "Replaces the category tabs on the Bagster inventory with sections: Hearthstone, Potion, Food, Consumable, Ammo, Devices and Quest on top, then Equipment (Armor, Weapon, Trinket, BOE), Crafting, Miscellaneous, Keys and Empty. The rarity filter stays. Needs the Bagster module on in DragonUI. The bank is not changed.")
         C:AddSpacer(container)
 
         local section = C:AddSection(container, "Inventory")
